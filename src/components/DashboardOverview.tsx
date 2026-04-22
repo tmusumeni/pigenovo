@@ -59,12 +59,12 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
 
     const { data: proofsData } = await supabase
       .from('proofs')
-      .select('*, tasks(reward_amount)')
+      .select('*, earn_tasks(reward_amount)')
       .eq('user_id', user.id)
       .eq('status', 'approved');
     
     if (proofsData) {
-      const amount = proofsData.reduce((acc, p) => acc + (p.tasks?.reward_amount || 0), 0);
+      const amount = proofsData.reduce((acc, p) => acc + (p.earn_tasks?.reward_amount || 0), 0);
       setWatchEarnings({ amount, count: proofsData.length });
     }
 
