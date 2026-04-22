@@ -1,0 +1,6 @@
+{
+  "name": "PiGenovo 2.0",
+  "description": "A business advice and trend prediction platform integrated with Supabase for authentication, real-time trading, and task management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
