@@ -240,20 +240,49 @@ export function AdminPanel() {
   };
 
   const fetchPendingProofs = async () => {
-    const { data } = await supabase
-      .from('proofs')
-      .select('*, profiles!user_id(full_name, email), earn_tasks(title, reward_amount, platform, requirements)')
-      .eq('status', 'pending');
-    setPendingProofs(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('proofs')
+        .select('*, profiles!user_id(full_name, email), earn_tasks(title, reward_amount, platform, requirements)')
+        .eq('status', 'pending');
+      
+      if (error) {
+        // Fallback: Fetch proofs without relationships
+        const { data: proofsData } = await supabase
+          .from('proofs')
+          .select('*')
+          .eq('status', 'pending');
+        setPendingProofs(proofsData || []);
+      } else {
+        setPendingProofs(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching pending proofs:', err);
+    }
   };
 
   const fetchAllTrades = async () => {
-    const { data } = await supabase
-      .from('trades')
-      .select('*, profiles!user_id(full_name, email), news_assets(name)')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    setAllTrades(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('trades')
+        .select('*, profiles!user_id(full_name, email), news_assets(name)')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (error) {
+        // Fallback: Fetch trades without relationships
+        const { data: tradesData } = await supabase
+          .from('trades')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+        setAllTrades(tradesData || []);
+      } else {
+        setAllTrades(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching trades:', err);
+    }
   };
 
   const handleAddAsset = async (e: React.FormEvent) => {
