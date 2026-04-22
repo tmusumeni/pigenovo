@@ -22,6 +22,8 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export function Wallet({ user }: { user: any }) {
   const [balance, setBalance] = useState(0);
+  const [earnedBalance, setEarnedBalance] = useState(0); // From Watch & Earn + Share & Earn
+  const [totalBalance, setTotalBalance] = useState(0); // balance + earned
   const [transactions, setTransactions] = useState<any[]>([]);
   const [exchangeRates, setExchangeRates] = useState({ usdt_rwf: 1300, pi_rwf: 45000 });
   const [loading, setLoading] = useState(true);
@@ -72,7 +74,45 @@ export function Wallet({ user }: { user: any }) {
 
   const fetchWallet = async () => {
     const { data } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
-    if (data) setBalance(data.balance);
+    if (data) {
+      setBalance(data.balance);
+      // Calculate earned balance from transactions
+      fetchEarnedBalance();
+    }
+  };
+
+  const fetchEarnedBalance = async () => {
+    try {
+      // Sum all approved reward transactions (Watch & Earn, Share & Earn)
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('type', 'reward')
+        .eq('status', 'completed');
+
+      if (error) {
+        console.error('Error fetching earned balance:', error);
+        return;
+      }
+
+      const earned = (data || []).reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+      setEarnedBalance(earned);
+      
+      // Get current balance from wallet
+      const { data: walletData } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (walletData) {
+        const total = Number(walletData.balance) + earned;
+        setTotalBalance(total);
+      }
+    } catch (err) {
+      console.error('Error calculating earned balance:', err);
+    }
   };
 
   const fetchTransactions = async () => {
@@ -83,6 +123,7 @@ export function Wallet({ user }: { user: any }) {
       .order('created_at', { ascending: false });
     setTransactions(data || []);
     setLoading(false);
+    fetchEarnedBalance(); // Recalculate earned balance
   };
 
   const calculateConverted = (val: number, type: string) => {
@@ -177,6 +218,42 @@ export function Wallet({ user }: { user: any }) {
 
   return (
     <div className="space-y-6">
+      {/* Wallet Breakdown Card */}
+      <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+        <CardHeader>
+          <CardTitle className="text-lg">Wallet Summary</CardTitle>
+          <CardDescription>Total balance breakdown from all sources</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Deposits Balance */}
+            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="text-xs font-bold text-blue-700 dark:text-blue-200 uppercase tracking-wider mb-2">Deposits</div>
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{Math.max(0, balance - earnedBalance).toLocaleString()} RWF</div>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">From transfers & deposits</p>
+            </div>
+
+            {/* Earned Balance */}
+            <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+              <div className="text-xs font-bold text-green-700 dark:text-green-200 uppercase tracking-wider mb-2">Earnings</div>
+              <div className="text-2xl font-bold text-green-900 dark:text-green-100">{earnedBalance.toLocaleString()} RWF</div>
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">Watch & Share rewards</p>
+            </div>
+
+            {/* Total Balance */}
+            <div className="p-4 bg-primary/20 dark:bg-primary/30 rounded-lg border border-primary/40 md:col-span-2">
+              <div className="text-xs font-bold text-primary-foreground/70 uppercase tracking-wider mb-2">Total Balance</div>
+              <div className="text-3xl font-bold text-primary">{totalBalance.toLocaleString()} RWF</div>
+              <div className="flex gap-3 text-xs text-muted-foreground mt-2 font-mono">
+                <p>{(totalBalance / exchangeRates.usdt_rwf).toFixed(2)} USDT</p>
+                <p>•</p>
+                <p>{(totalBalance / exchangeRates.pi_rwf).toFixed(4)} PI</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main Balance Card */}
         <Card className="md:col-span-2 bg-primary text-primary-foreground overflow-hidden relative">
@@ -186,7 +263,7 @@ export function Wallet({ user }: { user: any }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary-foreground/80 font-medium">
               <ShieldCheck className="h-4 w-4" />
-              Secure Balance
+              Current Wallet Balance
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2 pb-8">

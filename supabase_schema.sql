@@ -9,6 +9,10 @@ create table profiles (
   id uuid references auth.users on delete cascade primary key,
   email text unique not null,
   full_name text,
+  phone_number text unique,
+  country text,
+  country_code text, -- e.g., 'RW' for Rwanda, 'US' for United States
+  phone_flag text, -- emoji flag for country
   role text default 'user' check (role in ('user', 'admin')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -182,8 +186,16 @@ create policy "Users can insert their own trades" on trades for insert with chec
 create function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, full_name)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name');
+  insert into public.profiles (id, email, full_name, phone_number, country, country_code, phone_flag)
+  values (
+    new.id, 
+    new.email, 
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'phone_number',
+    new.raw_user_meta_data->>'country',
+    new.raw_user_meta_data->>'country_code',
+    new.raw_user_meta_data->>'phone_flag'
+  );
   
   insert into public.wallets (user_id, balance)
   values (new.id, 0.00);

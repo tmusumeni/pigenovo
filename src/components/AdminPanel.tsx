@@ -44,9 +44,10 @@ export function AdminPanel() {
   const [financialRequests, setFinancialRequests] = useState<any[]>([]);
   const [processedFinancials, setProcessedFinancials] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
+  const [userWalletData, setUserWalletData] = useState<any[]>([]);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [exchangeRates, setExchangeRates] = useState<any>({ usdt_rwf: 1300, pi_rwf: 45000 });
-  const [stats, setStats] = useState<any>({ totalVolume: 0, totalFees: 0, totalTrades: 0, totalUsers: 0 });
+  const [stats, setStats] = useState<any>({ totalVolume: 0, totalFees: 0, totalTrades: 0, totalUsers: 0, totalEarnings: 0, totalWalletBalance: 0 });
   
   // Market Form
   const [newName, setNewName] = useState('');
@@ -92,6 +93,7 @@ export function AdminPanel() {
     fetchExchangeRates();
     fetchAllProfiles();
     fetchAllTrades();
+    fetchUserWalletData();
 
     // REAL-TIME SUBSCRIPTIONS
     const financeChannel = supabase
@@ -245,14 +247,73 @@ export function AdminPanel() {
       const { data: trades } = await supabase.from('trades').select('amount, fee');
       const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
       
+      // Get total earnings from rewards
+      const { data: rewards } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('type', 'reward')
+        .eq('status', 'completed');
+      
+      // Get total wallet balance
+      const { data: wallets } = await supabase
+        .from('wallets')
+        .select('balance');
+      
+      const totalEarnings = (rewards || []).reduce((acc: number, t: any) => acc + Number(t.amount), 0);
+      const totalWalletBalance = (wallets || []).reduce((acc: number, w: any) => acc + Number(w.balance), 0);
+      
       if (trades) {
         const totalVolume = trades.reduce((acc, t) => acc + Number(t.amount), 0);
         const totalFees = trades.reduce((acc, t) => acc + Number(t.fee), 0);
         const totalTrades = trades.length;
-        setStats({ totalVolume, totalFees, totalTrades, totalUsers: userCount || 0 });
+        setStats({ totalVolume, totalFees, totalTrades, totalUsers: userCount || 0, totalEarnings, totalWalletBalance });
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchUserWalletData = async () => {
+    try {
+      const { data: wallets, error: walletError } = await supabase
+        .from('wallets')
+        .select('*, user_id')
+        .order('balance', { ascending: false });
+
+      if (walletError) throw walletError;
+
+      // Enrich with profile data and earnings
+      const enrichedData = await Promise.all(
+        (wallets || []).map(async (wallet) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', wallet.user_id)
+            .single();
+
+          const { data: rewards } = await supabase
+            .from('transactions')
+            .select('amount')
+            .eq('user_id', wallet.user_id)
+            .eq('type', 'reward')
+            .eq('status', 'completed');
+
+          const earned = (rewards || []).reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+          const total = Number(wallet.balance) + earned;
+
+          return {
+            ...wallet,
+            email: profile?.email || 'N/A',
+            full_name: profile?.full_name || 'Unknown',
+            earned,
+            total
+          };
+        })
+      );
+
+      setUserWalletData(enrichedData);
+    } catch (error) {
+      console.error('Error fetching wallet data:', error);
     }
   };
 
@@ -710,10 +771,57 @@ export function AdminPanel() {
     }
   };
 
+  const handleEditPhoneNumber = async (userId: string, currentPhone: string, currentCountry: string, currentCountryCode: string) => {
+    const newPhone = prompt(`Enter new phone number (current: ${currentPhone || 'None'}):`, currentPhone || '250788984216');
+    if (!newPhone) return;
+
+    // Sample country mapping (same as registration form)
+    const countryMap: Record<string, {name: string; flag: string}> = {
+      'RW': { name: 'Rwanda', flag: '🇷🇼' },
+      'UG': { name: 'Uganda', flag: '🇺🇬' },
+      'KE': { name: 'Kenya', flag: '🇰🇪' },
+      'TZ': { name: 'Tanzania', flag: '🇹🇿' },
+      'US': { name: 'United States', flag: '🇺🇸' },
+      'GB': { name: 'United Kingdom', flag: '🇬🇧' },
+      'CA': { name: 'Canada', flag: '🇨🇦' },
+      'AU': { name: 'Australia', flag: '🇦🇺' },
+      'ZA': { name: 'South Africa', flag: '🇿🇦' },
+      'NG': { name: 'Nigeria', flag: '🇳🇬' },
+    };
+
+    const newCountryCode = prompt(`Enter country code (current: ${currentCountryCode || 'RW'}):`, currentCountryCode || 'RW');
+    if (!newCountryCode) return;
+
+    const country = countryMap[newCountryCode];
+    if (!country) {
+      toast.error('Invalid country code');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          phone_number: newPhone,
+          country: country.name,
+          country_code: newCountryCode,
+          phone_flag: country.flag
+        })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      toast.success(`Phone number updated to ${newPhone} (${country.flag} ${newCountryCode})`);
+      fetchAllProfiles();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
   const filteredProfiles = allProfiles.filter(p => 
     p.full_name?.toLowerCase().includes(userSearchTerm.toLowerCase()) || 
     p.email?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-    p.id?.toLowerCase().includes(userSearchTerm.toLowerCase())
+    p.id?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+    p.phone_number?.toLowerCase().includes(userSearchTerm.toLowerCase())
   );
 
   const handleDeleteAsset = async (id: string) => {
@@ -856,6 +964,9 @@ export function AdminPanel() {
             )}
           </TabsTrigger>
           <TabsTrigger value="trades" className="rounded-lg">All Trades</TabsTrigger>
+          <TabsTrigger value="wallets" className="rounded-lg flex gap-2 items-center">
+            💰 Wallet Analytics
+          </TabsTrigger>
           <TabsTrigger value="users" className="rounded-lg">Users</TabsTrigger>
           <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
         </TabsList>
@@ -1558,12 +1669,128 @@ export function AdminPanel() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="wallets" className="space-y-6">
+          {/* Wallet Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-200">Total Users</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">{userWalletData.length}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-green-700 dark:text-green-200">Total Earnings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-900 dark:text-green-100">{stats.totalEarnings.toLocaleString()} RWF</div>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">From Watch & Share</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-200">Total Wallet Balance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-purple-900 dark:text-purple-100">{stats.totalWalletBalance.toLocaleString()} RWF</div>
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">Deposits + Earnings</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-200">Avg Balance/User</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-orange-900 dark:text-orange-100">
+                  {userWalletData.length > 0 ? (stats.totalWalletBalance / userWalletData.length).toLocaleString('en-US', { maximumFractionDigits: 0 }) : 0} RWF
+                </div>
+                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Per user</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* User Wallet Details Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>User Wallet Breakdown</CardTitle>
+              <CardDescription>All users with deposit balance, earnings, and total</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-muted/50">
+                    <tr>
+                      <th className="text-left p-3 font-bold">User</th>
+                      <th className="text-right p-3 font-bold">Deposits (RWF)</th>
+                      <th className="text-right p-3 font-bold">Earnings (RWF)</th>
+                      <th className="text-right p-3 font-bold">Total (RWF)</th>
+                      <th className="text-center p-3 font-bold">Last Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userWalletData.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center p-4 text-muted-foreground">
+                          No wallet data
+                        </td>
+                      </tr>
+                    ) : (
+                      userWalletData.map((wallet) => {
+                        const deposits = Math.max(0, wallet.balance - wallet.earned);
+                        
+                        return (
+                          <motion.tr 
+                            key={wallet.id}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="border-b hover:bg-muted/50 transition-colors"
+                          >
+                            <td className="p-3">
+                              <div>
+                                <p className="font-semibold">{wallet.full_name}</p>
+                                <p className="text-xs text-muted-foreground">{wallet.email}</p>
+                              </div>
+                            </td>
+                            <td className="text-right p-3 font-mono">
+                              <span className="bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 px-2 py-1 rounded">
+                                {deposits.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="text-right p-3 font-mono">
+                              <span className="bg-green-100 dark:bg-green-900 text-green-900 dark:text-green-100 px-2 py-1 rounded">
+                                {wallet.earned.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="text-right p-3 font-mono font-bold">
+                              <span className="bg-primary/20 text-primary dark:text-primary-foreground px-2 py-1 rounded">
+                                {wallet.total.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="text-center p-3 text-xs text-muted-foreground">
+                              {new Date(wallet.updated_at).toLocaleDateString()}
+                            </td>
+                          </motion.tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="users">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
                 <CardTitle>User Management</CardTitle>
-                <CardDescription>View all registered users and adjust wallet balances.</CardDescription>
+                <CardDescription>View all registered users, manage phone numbers, and adjust wallet balances.</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Input 
@@ -1580,6 +1807,7 @@ export function AdminPanel() {
                   <thead>
                     <tr className="border-b text-muted-foreground">
                       <th className="text-left pb-3 font-medium">User Details</th>
+                      <th className="text-left pb-3 font-medium">Phone Number</th>
                       <th className="text-right pb-3 font-medium">Role</th>
                       <th className="text-right pb-3 font-medium">Balance (RWF)</th>
                       <th className="text-right pb-3 font-medium">Actions</th>
@@ -1588,7 +1816,7 @@ export function AdminPanel() {
                   <tbody className="divide-y">
                     {filteredProfiles.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                        <td colSpan={5} className="py-8 text-center text-muted-foreground">
                           No users found matching your search.
                         </td>
                       </tr>
@@ -1599,6 +1827,19 @@ export function AdminPanel() {
                             <div className="font-bold">{profile.full_name || 'No Name'}</div>
                             <div className="text-xs text-muted-foreground">{profile.email}</div>
                             <div className="text-[10px] text-muted-foreground/50 font-mono mt-0.5">{profile.id}</div>
+                          </td>
+                          <td className="py-4">
+                            {profile.phone_number ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{profile.phone_flag || '🌍'}</span>
+                                <div>
+                                  <div className="font-mono font-bold">{profile.phone_number}</div>
+                                  <div className="text-xs text-muted-foreground">{profile.country} ({profile.country_code})</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground italic">No phone assigned</div>
+                            )}
                           </td>
                           <td className="py-4 text-right">
                             <button 
@@ -1623,6 +1864,14 @@ export function AdminPanel() {
                                 onClick={() => handleAdjustBalance(profile.id, profile.wallets?.[0]?.balance || 0)}
                               >
                                 Adjust Balance
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-[10px]"
+                                onClick={() => handleEditPhoneNumber(profile.id, profile.phone_number, profile.country, profile.country_code)}
+                              >
+                                Edit Phone
                               </Button>
                             </div>
                           </td>

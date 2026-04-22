@@ -18,6 +18,10 @@ export function Auth() {
   const [showOtp, setShowOtp] = useState(false);
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [fullName, setFullName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [country, setCountry] = useState('Rwanda');
+  const [countryCode, setCountryCode] = useState('RW');
+  const [phoneFlag, setPhoneFlag] = useState('🇷🇼');
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('login');
@@ -158,6 +162,10 @@ export function Auth() {
       setError('Supabase is not configured. Please set your environment variables.');
       return;
     }
+    if (!phoneNumber) {
+      setError('Phone number is required');
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({ 
@@ -165,7 +173,11 @@ export function Auth() {
         password,
         options: {
           data: {
-            full_name: fullName
+            full_name: fullName,
+            phone_number: phoneNumber,
+            country: country,
+            country_code: countryCode,
+            phone_flag: phoneFlag
           }
         }
       });
@@ -384,6 +396,77 @@ export function Auth() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-phone">Phone Number</Label>
+                    <div className="flex gap-2">
+                      <select 
+                        className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 w-20"
+                        value={countryCode}
+                        onChange={(e) => {
+                          const code = e.target.value;
+                          const countryMap: Record<string, {name: string; flag: string}> = {
+                            'RW': { name: 'Rwanda', flag: '🇷🇼' },
+                            'UG': { name: 'Uganda', flag: '🇺🇬' },
+                            'KE': { name: 'Kenya', flag: '🇰🇪' },
+                            'TZ': { name: 'Tanzania', flag: '🇹🇿' },
+                            'US': { name: 'United States', flag: '🇺🇸' },
+                            'GB': { name: 'United Kingdom', flag: '🇬🇧' },
+                            'CA': { name: 'Canada', flag: '🇨🇦' },
+                            'AU': { name: 'Australia', flag: '🇦🇺' },
+                            'ZA': { name: 'South Africa', flag: '🇿🇦' },
+                            'NG': { name: 'Nigeria', flag: '🇳🇬' },
+                            'EG': { name: 'Egypt', flag: '🇪🇬' },
+                            'FR': { name: 'France', flag: '🇫🇷' },
+                            'DE': { name: 'Germany', flag: '🇩🇪' },
+                            'IT': { name: 'Italy', flag: '🇮🇹' },
+                            'ES': { name: 'Spain', flag: '🇪🇸' },
+                            'IN': { name: 'India', flag: '🇮🇳' },
+                            'JP': { name: 'Japan', flag: '🇯🇵' },
+                            'CN': { name: 'China', flag: '🇨🇳' },
+                            'BR': { name: 'Brazil', flag: '🇧🇷' },
+                            'MX': { name: 'Mexico', flag: '🇲🇽' }
+                          };
+                          const country = countryMap[code];
+                          if (country) {
+                            setCountryCode(code);
+                            setCountry(country.name);
+                            setPhoneFlag(country.flag);
+                          }
+                        }}
+                      >
+                        <option value="RW">🇷🇼 RW</option>
+                        <option value="UG">🇺🇬 UG</option>
+                        <option value="KE">🇰🇪 KE</option>
+                        <option value="TZ">🇹🇿 TZ</option>
+                        <option value="US">🇺🇸 US</option>
+                        <option value="GB">🇬🇧 GB</option>
+                        <option value="CA">🇨🇦 CA</option>
+                        <option value="AU">🇦🇺 AU</option>
+                        <option value="ZA">🇿🇦 ZA</option>
+                        <option value="NG">🇳🇬 NG</option>
+                        <option value="EG">🇪🇬 EG</option>
+                        <option value="FR">🇫🇷 FR</option>
+                        <option value="DE">🇩🇪 DE</option>
+                        <option value="IT">🇮🇹 IT</option>
+                        <option value="ES">🇪🇸 ES</option>
+                        <option value="IN">🇮🇳 IN</option>
+                        <option value="JP">🇯🇵 JP</option>
+                        <option value="CN">🇨🇳 CN</option>
+                        <option value="BR">🇧🇷 BR</option>
+                        <option value="MX">🇲🇽 MX</option>
+                      </select>
+                      <Input
+                        id="reg-phone"
+                        type="tel"
+                        placeholder="788984216"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        required
+                        className="flex-1"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">E.g., for Rwanda: 250788984216 or 788984216</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reg-password">Password</Label>
