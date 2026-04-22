@@ -39,6 +39,8 @@ export function AdminPanel() {
   const [assets, setAssets] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [pendingProofs, setPendingProofs] = useState<any[]>([]);
+  const [ads, setAds] = useState<any[]>([]);
+  const [pendingAdShares, setPendingAdShares] = useState<any[]>([]);
   const [financialRequests, setFinancialRequests] = useState<any[]>([]);
   const [processedFinancials, setProcessedFinancials] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
@@ -60,6 +62,20 @@ export function AdminPanel() {
   const [taskUrl, setTaskUrl] = useState('');
   const [taskReward, setTaskReward] = useState('100');
   const [taskRequirements, setTaskRequirements] = useState('Subscribe, Like, Watch 3min (No Skip)');
+  const [taskProofImageFile, setTaskProofImageFile] = useState<File | null>(null);
+  const [taskProofLink, setTaskProofLink] = useState('');
+  const [taskProofImagePreview, setTaskProofImagePreview] = useState<string>('');
+  const [proofUploading, setProofUploading] = useState(false);
+  
+  // Ad Form
+  const [adTitle, setAdTitle] = useState('');
+  const [adImageFile, setAdImageFile] = useState<File | null>(null);
+  const [adImagePreview, setAdImagePreview] = useState<string>('');
+  const [adLink, setAdLink] = useState('');
+  const [adReward, setAdReward] = useState('200');
+  const [adDescription, setAdDescription] = useState('');
+  const [adUploading, setAdUploading] = useState(false);
+  
   const [allTrades, setAllTrades] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(false);
@@ -69,6 +85,8 @@ export function AdminPanel() {
     fetchStats();
     fetchTasks();
     fetchPendingProofs();
+    fetchAds();
+    fetchPendingAdShares();
     fetchFinancialRequests();
     fetchProcessedFinancials();
     fetchExchangeRates();
@@ -93,6 +111,14 @@ export function AdminPanel() {
       })
       .subscribe();
 
+    const adShareChannel = supabase
+      .channel('admin-ad-share-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ad_shares' }, () => {
+        fetchPendingAdShares();
+        fetchStats();
+      })
+      .subscribe();
+
     const tradeChannel = supabase
       .channel('admin-trade-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, () => {
@@ -112,6 +138,7 @@ export function AdminPanel() {
     return () => {
       supabase.removeChannel(financeChannel);
       supabase.removeChannel(proofChannel);
+      supabase.removeChannel(adShareChannel);
       supabase.removeChannel(tradeChannel);
       supabase.removeChannel(profileChannel);
     };
@@ -261,6 +288,42 @@ export function AdminPanel() {
     }
   };
 
+  const fetchAds = async () => {
+    try {
+      const { data } = await supabase
+        .from('ads')
+        .select('*')
+        .order('created_at', { ascending: false });
+      setAds(data || []);
+    } catch (err) {
+      console.error('Error fetching ads:', err);
+    }
+  };
+
+  const fetchPendingAdShares = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ad_shares')
+        .select('*, profiles!user_id(full_name, email), ads(title, reward_amount, image_url, link)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        // Fallback: Fetch without relationships
+        const { data: sharesData } = await supabase
+          .from('ad_shares')
+          .select('*')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+        setPendingAdShares(sharesData || []);
+      } else {
+        setPendingAdShares(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching ad shares:', err);
+    }
+  };
+
   const fetchAllTrades = async () => {
     try {
       const { data, error } = await supabase
@@ -319,14 +382,42 @@ export function AdminPanel() {
     if (!taskTitle || !taskUrl) return;
 
     setLoading(true);
+    setProofUploading(true);
     try {
+      let proofImageUrl = '';
+
+      // Upload proof image for WhatsApp tasks if provided
+      if (taskPlatform === 'whatsapp' && taskProofImageFile) {
+        const fileExt = taskProofImageFile.name.split('.').pop();
+        const fileName = `task-proof-${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('proofs')
+          .upload(fileName, taskProofImageFile);
+
+        if (uploadError) {
+          console.error('Upload Error:', uploadError);
+          throw new Error('Failed to upload proof image: ' + uploadError.message);
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('proofs')
+          .getPublicUrl(fileName);
+
+        proofImageUrl = urlData.publicUrl;
+      }
+
+      // Insert task with proof data
       const { error } = await supabase.from('earn_tasks').insert({
         title: taskTitle,
         platform: taskPlatform,
         task_url: taskUrl,
         reward_amount: Number(taskReward),
         requirements: taskRequirements,
-        is_active: true
+        is_active: true,
+        proof_image_url: proofImageUrl || null,
+        proof_link: taskProofLink || null
       });
 
       if (error) {
@@ -339,17 +430,37 @@ export function AdminPanel() {
       setTaskUrl('');
       setTaskReward('100');
       setTaskRequirements('Subscribe, Like, Watch 3min (No Skip)');
+      setTaskProofImageFile(null);
+      setTaskProofLink('');
+      setTaskProofImagePreview('');
       fetchTasks();
     } catch (error: any) {
       toast.error(error.message || 'Failed to add task. Check console for details.');
     } finally {
       setLoading(false);
+      setProofUploading(false);
     }
+  };
+
+  const handleProofImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setTaskProofImageFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setTaskProofImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleApproveProof = async (proofId: string, userId: string, amount: number) => {
     try {
-      // 1. Update proof status
+      // Update proof status to 'approved'
+      // The database trigger will automatically:
+      // 1. Add reward to user wallet
+      // 2. Create a transaction record
       const { error: proofError } = await supabase
         .from('proofs')
         .update({ status: 'approved' })
@@ -357,23 +468,9 @@ export function AdminPanel() {
 
       if (proofError) throw proofError;
 
-      // 2. Add reward to user wallet
-      const { data: wallet } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', userId)
-        .single();
-
-      if (wallet) {
-        const currentBalance = Number(wallet.balance) || 0;
-        await supabase
-          .from('wallets')
-          .update({ balance: currentBalance + Number(amount) })
-          .eq('user_id', userId);
-      }
-
-      toast.success('Proof approved and reward sent');
+      toast.success(`Proof approved! ${amount} RWF reward sent to user wallet.`);
       fetchPendingProofs();
+      fetchStats();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -384,6 +481,100 @@ export function AdminPanel() {
       await supabase.from('proofs').update({ status: 'rejected' }).eq('id', proofId);
       toast.success('Proof rejected');
       fetchPendingProofs();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleAddAd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adTitle || !adImageFile || !adLink) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setLoading(true);
+    setAdUploading(true);
+    try {
+      // Upload ad image
+      const fileExt = adImageFile.name.split('.').pop();
+      const fileName = `ad-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('proofs')
+        .upload(fileName, adImageFile);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('proofs')
+        .getPublicUrl(fileName);
+
+      const adImageUrl = urlData.publicUrl;
+
+      // Create ad record
+      const { error: insertError } = await supabase.from('ads').insert({
+        title: adTitle,
+        image_url: adImageUrl,
+        link: adLink,
+        reward_amount: Number(adReward),
+        description: adDescription,
+        is_active: true
+      });
+
+      if (insertError) throw insertError;
+
+      toast.success('Ad created successfully!');
+      setAdTitle('');
+      setAdImageFile(null);
+      setAdImagePreview('');
+      setAdLink('');
+      setAdReward('200');
+      setAdDescription('');
+      fetchAds();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create ad');
+    } finally {
+      setLoading(false);
+      setAdUploading(false);
+    }
+  };
+
+  const handleAdImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setAdImageFile(file);
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAdImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleApproveAdShare = async (shareId: string, userId: string, amount: number) => {
+    try {
+      const { error } = await supabase
+        .from('ad_shares')
+        .update({ status: 'approved' })
+        .eq('id', shareId);
+
+      if (error) throw error;
+
+      toast.success(`Ad share approved! ${amount} RWF reward sent.`);
+      fetchPendingAdShares();
+      fetchStats();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleRejectAdShare = async (shareId: string) => {
+    try {
+      await supabase.from('ad_shares').update({ status: 'rejected' }).eq('id', shareId);
+      toast.success('Ad share rejected');
+      fetchPendingAdShares();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -640,6 +831,14 @@ export function AdminPanel() {
         <TabsList className="bg-muted/50 p-1 rounded-xl">
           <TabsTrigger value="markets" className="rounded-lg">Markets & Assets</TabsTrigger>
           <TabsTrigger value="tasks" className="rounded-lg">Watch & Earn Tasks</TabsTrigger>
+          <TabsTrigger value="ads" className="rounded-lg flex gap-2 items-center">
+            Share & Earn Ads
+            {pendingAdShares.length > 0 && (
+              <span className="bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                {pendingAdShares.length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="proofs" className="rounded-lg flex gap-2 items-center">
             Proof Approvals
             {pendingProofs.length > 0 && (
@@ -795,9 +994,46 @@ export function AdminPanel() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+
+                  {/* WhatsApp-specific fields */}
+                  {taskPlatform === 'whatsapp' && (
+                    <>
+                      <div className="space-y-2 bg-blue-50 dark:bg-blue-950 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <Label className="text-sm font-semibold">Proof Example (WhatsApp Only)</Label>
+                        <p className="text-xs text-muted-foreground mb-2">Upload an example image or add a link showing what users should submit as proof</p>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="taskProofImage" className="text-xs">Upload Proof Image (Optional)</Label>
+                          <Input 
+                            id="taskProofImage" 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleProofImageChange}
+                            disabled={proofUploading}
+                          />
+                          {taskProofImagePreview && (
+                            <div className="w-full h-32 rounded-lg border-2 border-dashed border-blue-300 bg-white dark:bg-slate-900 flex items-center justify-center overflow-hidden">
+                              <img src={taskProofImagePreview} alt="Preview" className="max-h-full max-w-full object-contain" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="taskProofLink" className="text-xs">Proof Link or Instructions (Optional)</Label>
+                          <Input 
+                            id="taskProofLink" 
+                            placeholder="https://example.com or instructions text" 
+                            value={taskProofLink}
+                            onChange={(e) => setTaskProofLink(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <Button type="submit" className="w-full" disabled={loading || proofUploading}>
                     <Plus className="h-4 w-4 mr-2" />
-                    {loading ? 'Adding...' : 'Create Task'}
+                    {loading || proofUploading ? 'Adding...' : 'Create Task'}
                   </Button>
                 </form>
               </CardContent>
@@ -833,6 +1069,204 @@ export function AdminPanel() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="ads" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create Share & Earn Ad</CardTitle>
+                <CardDescription>Add a new ad for users to share on WhatsApp status within 24h.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleAddAd} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="adTitle">Ad Title</Label>
+                    <Input 
+                      id="adTitle" 
+                      placeholder="e.g., New Product Launch" 
+                      value={adTitle}
+                      onChange={(e) => setAdTitle(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="adImage">Ad Image (Required)</Label>
+                    <Input 
+                      id="adImage" 
+                      type="file" 
+                      accept="image/*"
+                      onChange={handleAdImageChange}
+                      disabled={adUploading}
+                      required
+                    />
+                    {adImagePreview && (
+                      <div className="w-full h-40 rounded-lg border-2 border-dashed border-green-300 bg-white dark:bg-slate-900 flex items-center justify-center overflow-hidden">
+                        <img src={adImagePreview} alt="Preview" className="max-h-full max-w-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="adLink">Promotion Link</Label>
+                    <Input 
+                      id="adLink" 
+                      placeholder="https://example.com" 
+                      value={adLink}
+                      onChange={(e) => setAdLink(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="adDescription">Description (Optional)</Label>
+                    <Input 
+                      id="adDescription" 
+                      placeholder="What users should know about this ad" 
+                      value={adDescription}
+                      onChange={(e) => setAdDescription(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="adReward">Reward Amount (RWF)</Label>
+                    <Input 
+                      id="adReward" 
+                      type="number" 
+                      value={adReward}
+                      onChange={(e) => setAdReward(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={loading || adUploading}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {loading || adUploading ? 'Creating...' : 'Create Ad'}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Active Ads</CardTitle>
+                <CardDescription>Manage current share & earn ads.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {ads.filter(ad => ad.is_active).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No active ads</p>
+                  ) : (
+                    ads.filter(ad => ad.is_active).map((ad) => (
+                      <div key={ad.id} className="p-3 border rounded-lg bg-green-50 dark:bg-green-950 space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-bold text-sm">{ad.title}</p>
+                            <p className="text-[10px] text-muted-foreground">{ad.description}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-green-600">{ad.reward_amount} RWF</p>
+                            <p className="text-[10px] text-muted-foreground">per share</p>
+                          </div>
+                        </div>
+                        {ad.image_url && (
+                          <img src={ad.image_url} alt={ad.title} className="w-full h-24 object-cover rounded" />
+                        )}
+                        <div className="flex gap-2">
+                          <a href={ad.link} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="outline" className="text-[10px]">
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              View Link
+                            </Button>
+                          </a>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Pending Ad Shares for Approval */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Ad Share Approvals</CardTitle>
+              <CardDescription>Review user proofs of posting ads on WhatsApp status.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {pendingAdShares.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No pending ad shares</p>
+                ) : (
+                  pendingAdShares.map((share) => {
+                    const userData = share.profiles || { full_name: 'Unknown User', email: 'N/A' };
+                    const adData = share.ads || { title: 'Unknown Ad', reward_amount: 0 };
+                    const timeLeft = share.expires_at ? Math.max(0, new Date(share.expires_at).getTime() - Date.now()) : 0;
+
+                    return (
+                      <motion.div
+                        key={share.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 rounded-lg space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-2">
+                            <div>
+                              <p className="font-bold text-sm">{userData.full_name}</p>
+                              <p className="text-[10px] text-muted-foreground">{userData.email}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-green-700 dark:text-green-200">Ad: {adData.title}</p>
+                              <p className="text-xs text-muted-foreground">Reward: {adData.reward_amount} RWF</p>
+                            </div>
+                            {timeLeft > 0 && (
+                              <p className="text-[10px] text-amber-600">Expires in: {Math.ceil(timeLeft / (1000 * 60 * 60))}h</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="default"
+                              onClick={() => handleApproveAdShare(share.id, share.user_id, adData.reward_amount)}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="destructive"
+                              onClick={() => handleRejectAdShare(share.id)}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+
+                        {share.proof_image_url && (
+                          <div className="rounded-lg border overflow-hidden">
+                            <img src={share.proof_image_url} alt="Proof" className="w-full h-auto max-h-64 object-cover" />
+                          </div>
+                        )}
+
+                        {share.proof_link && (
+                          <div className="p-2 bg-white dark:bg-slate-900 rounded border text-[10px]">
+                            <p className="font-bold mb-1">Proof Link:</p>
+                            <a href={share.proof_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 break-all">
+                              {share.proof_link}
+                            </a>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="proofs">

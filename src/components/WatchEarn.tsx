@@ -283,6 +283,24 @@ export function WatchEarn({ user }: { user: any }) {
                     <CardDescription className="text-xs">
                       {task.requirements || 'Complete the task and upload a screenshot as proof.'}
                     </CardDescription>
+                    
+                    {isWhatsApp && (task.proof_image_url || task.proof_link) && (
+                      <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
+                        <p className="text-[10px] font-semibold text-blue-900 dark:text-blue-100 uppercase tracking-wider">Proof Example</p>
+                        {task.proof_image_url && (
+                          <div className="w-full rounded-md overflow-hidden border border-blue-300 dark:border-blue-700 bg-white dark:bg-slate-900">
+                            <img src={task.proof_image_url} alt="Proof Example" className="w-full h-auto max-h-40 object-cover" />
+                          </div>
+                        )}
+                        {task.proof_link && (
+                          <div className="text-[10px] text-blue-800 dark:text-blue-200 p-2 bg-blue-100 dark:bg-blue-900 rounded border border-blue-300 dark:border-blue-700">
+                            <p className="font-semibold mb-1">Instructions:</p>
+                            <p className="break-words">{task.proof_link}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     {isActive && isYouTube && (
                       <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-[10px] text-yellow-700 flex items-start gap-2">
                         <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />

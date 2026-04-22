@@ -72,6 +72,8 @@ create table earn_tasks (
   reward_amount decimal(12,2) default 100.00 not null,
   is_active boolean default true,
   requirements text, -- e.g. "Subscribe, Like, Watch 3min"
+  proof_image_url text, -- For WhatsApp: example proof image uploaded by admin
+  proof_link text, -- For WhatsApp: example proof link or instructions
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -83,6 +85,31 @@ create table proofs (
   status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
   admin_notes text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 3.5 Share & Earn (WhatsApp Status Ads)
+create table ads (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  image_url text not null, -- Ad image to post on WhatsApp status
+  link text not null, -- Link/promotion URL
+  reward_amount decimal(12,2) default 200.00 not null,
+  description text,
+  is_active boolean default true,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create table ad_shares (
+  id uuid default gen_random_uuid() primary key,
+  ad_id uuid references ads on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  proof_image_url text, -- Screenshot proof that user posted on status
+  proof_link text, -- Optional link proof
+  status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  admin_notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  expires_at timestamp with time zone default (now() + interval '24 hours'),
+  unique(ad_id, user_id) -- User can only share each ad once
 );
 
 -- 4. News Trading
@@ -110,6 +137,8 @@ alter table wallets enable row level security;
 alter table transactions enable row level security;
 alter table tasks enable row level security;
 alter table proofs enable row level security;
+alter table ads enable row level security;
+alter table ad_shares enable row level security;
 alter table news_assets enable row level security;
 alter table trades enable row level security;
 
@@ -136,6 +165,13 @@ create policy "Users can view their own proofs" on proofs for select using (auth
 create policy "Users can insert their own proofs" on proofs for insert with check (auth.uid() = user_id);
 create policy "Admins can update proofs" on proofs for update using (is_admin(auth.uid()));
 
+create policy "Users can view active ads" on ads for select using (is_active = true or is_admin(auth.uid()));
+create policy "Admins can manage ads" on ads for all using (is_admin(auth.uid()));
+
+create policy "Users can view their own ad shares" on ad_shares for select using (auth.uid() = user_id or is_admin(auth.uid()));
+create policy "Users can insert their own ad shares" on ad_shares for insert with check (auth.uid() = user_id);
+create policy "Admins can update ad shares" on ad_shares for update using (is_admin(auth.uid()));
+
 create policy "Anyone can view news assets" on news_assets for select using (true);
 create policy "Admins can manage assets" on news_assets for all using (is_admin(auth.uid()));
 
@@ -159,3 +195,107 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Trigger to credit wallet when proof is approved
+create or replace function public.handle_proof_approved()
+returns trigger as $$
+declare
+  task_reward decimal(12,2);
+  user_wallet_id uuid;
+begin
+  -- Only execute if status changed to 'approved'
+  if new.status = 'approved' and old.status != 'approved' then
+    -- Get the reward amount from the task
+    select reward_amount into task_reward from earn_tasks where id = new.task_id;
+    
+    -- Get the user's wallet
+    select id into user_wallet_id from wallets where user_id = new.user_id;
+    
+    if user_wallet_id is not null and task_reward > 0 then
+      -- Update wallet balance
+      update wallets 
+      set balance = balance + task_reward,
+          updated_at = now()
+      where id = user_wallet_id;
+      
+      -- Create transaction record
+      insert into transactions (wallet_id, type, amount, status, description)
+      values (user_wallet_id, 'reward', task_reward, 'completed', 'Watch & Earn reward - Proof approved');
+    end if;
+  end if;
+  
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_proof_approved
+  after update on proofs
+  for each row execute procedure public.handle_proof_approved();
+
+-- Trigger to credit wallet when ad share is approved
+create or replace function public.handle_ad_share_approved()
+returns trigger as $$
+declare
+  ad_reward decimal(12,2);
+  user_wallet_id uuid;
+begin
+  -- Only execute if status changed to 'approved'
+  if new.status = 'approved' and old.status != 'approved' then
+    -- Get the reward amount from the ad
+    select reward_amount into ad_reward from ads where id = new.ad_id;
+    
+    -- Get the user's wallet
+    select id into user_wallet_id from wallets where user_id = new.user_id;
+    
+    if user_wallet_id is not null and ad_reward > 0 then
+      -- Update wallet balance
+      update wallets 
+      set balance = balance + ad_reward,
+          updated_at = now()
+      where id = user_wallet_id;
+      
+      -- Create transaction record
+      insert into transactions (wallet_id, type, amount, status, description)
+      values (user_wallet_id, 'reward', ad_reward, 'completed', 'Share & Earn reward - Ad share approved');
+    end if;
+  end if;
+  
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_ad_share_approved
+  after update on ad_shares
+  for each row execute procedure public.handle_ad_share_approved();
+
+-- ======== STORAGE BUCKET POLICIES ========
+-- Run this section in your Supabase SQL Editor
+
+-- First, ensure the 'proofs' bucket exists with RLS enabled
+INSERT INTO storage.buckets (id, name, public, avif_autodetection) 
+VALUES ('proofs', 'proofs', false, false) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Allow authenticated users to upload files to proofs bucket
+CREATE POLICY "Allow authenticated users to upload proofs"
+ON storage.objects 
+FOR INSERT 
+TO authenticated
+WITH CHECK (bucket_id = 'proofs');
+
+-- Allow users to view all proofs (admins verify via database)
+CREATE POLICY "Allow authenticated users to view proofs"
+ON storage.objects 
+FOR SELECT 
+TO authenticated
+USING (bucket_id = 'proofs');
+
+-- Allow admins to delete proofs
+CREATE POLICY "Allow admins to delete proofs"
+ON storage.objects 
+FOR DELETE 
+TO authenticated
+USING (
+  bucket_id = 'proofs' AND 
+  auth.jwt() ->> 'email' = 'tmusumeni@gmail.com'
+);
