@@ -26,22 +26,55 @@ export function Auth() {
     const handleMessage = async (event: MessageEvent) => {
       // Validate origin
       const origin = event.origin;
-      if (!origin.endsWith('.run.app') && !origin.includes('localhost')) {
+      if (!origin.endsWith('.run.app') && !origin.includes('localhost') && !origin.includes('vercel.app')) {
         return;
       }
 
       if (event.data?.type === 'OAUTH_CALLBACK') {
-        const { search } = event.data;
-        const params = new URLSearchParams(search);
-        const code = params.get('code');
+        const { hash, search } = event.data;
         
-        if (code) {
+        // Try hash first (for OAuth token with skipBrowserRedirect)
+        if (hash) {
           setLoading(true);
           try {
-            const { error } = await supabase.auth.exchangeCodeForSession(code);
-            if (error) throw error;
-            toast.success('Logged in with Google!');
-            window.location.href = '/';
+            const hashParams = new URLSearchParams(hash.replace('#', ''));
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+            const expiresIn = hashParams.get('expires_in');
+            
+            if (accessToken && refreshToken) {
+              const expiresAt = Date.now() + (parseInt(expiresIn || '3600') * 1000);
+              const { error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+              
+              if (error) throw error;
+              toast.success('Logged in with Google!');
+              window.location.href = '/';
+              return;
+            }
+          } catch (err: any) {
+            console.error('Hash-based OAuth error:', err);
+          } finally {
+            setLoading(false);
+          }
+        }
+        
+        // Fallback: Try search params for code-based exchange
+        if (search) {
+          setLoading(true);
+          try {
+            const params = new URLSearchParams(search);
+            const code = params.get('code');
+            
+            if (code) {
+              const { error } = await supabase.auth.exchangeCodeForSession(code);
+              if (error) throw error;
+              toast.success('Logged in with Google!');
+              window.location.href = '/';
+              return;
+            }
           } catch (err: any) {
             toast.error(err.message || 'Failed to complete Google sign in');
           } finally {
