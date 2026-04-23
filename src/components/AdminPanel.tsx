@@ -247,19 +247,31 @@ export function AdminPanel() {
       const { data: trades } = await supabase.from('trades').select('amount, fee');
       const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
       
-      // Get total earnings from rewards
-      const { data: rewards } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('type', 'reward')
-        .eq('status', 'completed');
+      // Get total earnings from proofs (Watch & Earn)
+      const { data: proofsData } = await supabase
+        .from('proofs')
+        .select('*, earn_tasks(reward_amount)')
+        .eq('status', 'approved');
+      
+      const totalEarningsFromProofs = (proofsData || []).reduce((sum: number, p: any) => 
+        sum + (p.earn_tasks?.reward_amount || 0), 0);
+
+      // Get total earnings from ad_shares (Share & Earn)
+      const { data: adSharesData } = await supabase
+        .from('ad_shares')
+        .select('*, ads(reward_amount)')
+        .eq('status', 'approved');
+
+      const totalEarningsFromAds = (adSharesData || []).reduce((sum: number, a: any) => 
+        sum + (a.ads?.reward_amount || 0), 0);
+
+      const totalEarnings = totalEarningsFromProofs + totalEarningsFromAds;
       
       // Get total wallet balance
       const { data: wallets } = await supabase
         .from('wallets')
         .select('balance');
       
-      const totalEarnings = (rewards || []).reduce((acc: number, t: any) => acc + Number(t.amount), 0);
       const totalWalletBalance = (wallets || []).reduce((acc: number, w: any) => acc + Number(w.balance), 0);
       
       if (trades) {
@@ -291,21 +303,34 @@ export function AdminPanel() {
             .eq('id', wallet.user_id)
             .single();
 
-          const { data: rewards } = await supabase
-            .from('transactions')
-            .select('amount')
+          // Get earnings from approved proofs (Watch & Earn)
+          const { data: proofsData } = await supabase
+            .from('proofs')
+            .select('*, earn_tasks(reward_amount)')
             .eq('user_id', wallet.user_id)
-            .eq('type', 'reward')
-            .eq('status', 'completed');
+            .eq('status', 'approved');
 
-          const earned = (rewards || []).reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-          const total = Number(wallet.balance) + earned;
+          const earnedFromProofs = (proofsData || []).reduce((sum: number, p: any) => 
+            sum + (p.earn_tasks?.reward_amount || 0), 0);
+
+          // Get earnings from approved ad_shares (Share & Earn)
+          const { data: adSharesData } = await supabase
+            .from('ad_shares')
+            .select('*, ads(reward_amount)')
+            .eq('user_id', wallet.user_id)
+            .eq('status', 'approved');
+
+          const earnedFromAds = (adSharesData || []).reduce((sum: number, a: any) => 
+            sum + (a.ads?.reward_amount || 0), 0);
+
+          const totalEarned = earnedFromProofs + earnedFromAds;
+          const total = Number(wallet.balance) + totalEarned;
 
           return {
             ...wallet,
             email: profile?.email || 'N/A',
             full_name: profile?.full_name || 'Unknown',
-            earned,
+            earned: totalEarned,
             total
           };
         })
