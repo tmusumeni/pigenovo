@@ -90,21 +90,39 @@ export function Wallet({ user }: { user: any }) {
 
   const fetchEarnedBalance = async () => {
     try {
-      // Sum all approved reward transactions (Watch & Earn, Share & Earn)
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('amount')
+      // Sum all approved proofs with their earn_tasks reward amounts (Watch & Earn)
+      const { data: proofsData, error: proofsError } = await supabase
+        .from('proofs')
+        .select('*, earn_tasks(reward_amount)')
         .eq('user_id', user.id)
-        .eq('type', 'reward')
-        .eq('status', 'completed');
+        .eq('status', 'approved');
 
-      if (error) {
-        console.error('Error fetching earned balance:', error);
+      if (proofsError) {
+        console.error('Error fetching proofs:', proofsError);
         return;
       }
 
-      const earned = (data || []).reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-      setEarnedBalance(earned);
+      // Calculate total earned from proofs
+      const earnedFromProofs = (proofsData || []).reduce((sum: number, p: any) => 
+        sum + (p.earn_tasks?.reward_amount || 0), 0);
+
+      // Also get earnings from ad_shares (Share & Earn)
+      const { data: adSharesData, error: adError } = await supabase
+        .from('ad_shares')
+        .select('*, ads(reward_amount)')
+        .eq('user_id', user.id)
+        .eq('status', 'approved');
+
+      if (adError) {
+        console.error('Error fetching ad shares:', adError);
+      }
+
+      const earnedFromAds = (adSharesData || []).reduce((sum: number, a: any) => 
+        sum + (a.ads?.reward_amount || 0), 0);
+
+      // Total earned balance
+      const totalEarned = earnedFromProofs + earnedFromAds;
+      setEarnedBalance(totalEarned);
       
       // Get current balance from wallet
       const { data: walletData } = await supabase
@@ -114,7 +132,7 @@ export function Wallet({ user }: { user: any }) {
         .single();
       
       if (walletData) {
-        const total = Number(walletData.balance) + earned;
+        const total = Number(walletData.balance) + totalEarned;
         setTotalBalance(total);
       }
     } catch (err) {
