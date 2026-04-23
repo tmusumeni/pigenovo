@@ -24,6 +24,7 @@ export function Wallet({ user }: { user: any }) {
   const [balance, setBalance] = useState(0);
   const [earnedBalance, setEarnedBalance] = useState(0); // From Watch & Earn + Share & Earn
   const [totalBalance, setTotalBalance] = useState(0); // balance + earned
+  const [profile, setProfile] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [exchangeRates, setExchangeRates] = useState({ usdt_rwf: 1300, pi_rwf: 45000 });
   const [loading, setLoading] = useState(true);
@@ -34,6 +35,7 @@ export function Wallet({ user }: { user: any }) {
 
   useEffect(() => {
     fetchWallet();
+    fetchProfile();
     fetchTransactions();
     fetchExchangeRates();
     
@@ -70,6 +72,11 @@ export function Wallet({ user }: { user: any }) {
   const fetchExchangeRates = async () => {
     const { data } = await supabase.from('settings').select('*').eq('id', 'exchange_rates').single();
     if (data) setExchangeRates(data.value);
+  };
+
+  const fetchProfile = async () => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if (data) setProfile(data);
   };
 
   const fetchWallet = async () => {
@@ -171,7 +178,12 @@ export function Wallet({ user }: { user: any }) {
           note: details, 
           timestamp: new Date().toISOString(),
           requested_rwf: rwfAmount,
-          rate_used: method === 'usdt' ? exchangeRates.usdt_rwf : method === 'pi_network' ? exchangeRates.pi_rwf : 1
+          rate_used: method === 'usdt' ? exchangeRates.usdt_rwf : method === 'pi_network' ? exchangeRates.pi_rwf : 1,
+          user_phone: profile?.phone_number,
+          user_phone_flag: profile?.phone_flag,
+          user_country: profile?.country,
+          user_country_code: profile?.country_code,
+          full_name: profile?.full_name
         },
         status: status
       });
@@ -462,6 +474,13 @@ export function Wallet({ user }: { user: any }) {
                       <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
                         {new Date(tx.created_at).toLocaleString()} | {tx.details?.note}
                       </div>
+                      {tx.details?.user_phone && (
+                        <div className="text-[9px] text-muted-foreground mt-1 flex items-center gap-1">
+                          <span className="text-sm">{tx.details.user_phone_flag}</span>
+                          <span className="font-mono">{tx.details.user_phone}</span>
+                          <span className="text-muted-foreground">({tx.details.user_country})</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">

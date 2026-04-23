@@ -1504,6 +1504,13 @@ export function AdminPanel() {
                             <div>
                               <h4 className="font-bold text-lg">{req.profiles?.full_name || req.profiles?.[0]?.full_name || 'User'}</h4>
                               <p className="text-sm text-muted-foreground">{req.profiles?.email || req.profiles?.[0]?.email || 'N/A'}</p>
+                              {req.details?.user_phone && (
+                                <div className="text-sm font-mono mt-1 flex items-center gap-1">
+                                  <span className="text-lg">{req.details.user_phone_flag}</span>
+                                  <span>{req.details.user_phone}</span>
+                                  <span className="text-xs text-muted-foreground">({req.details.user_country_code})</span>
+                                </div>
+                              )}
                               <div className="flex gap-2 mt-1">
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-muted uppercase tracking-wider">
                                   {req.method}
@@ -1564,6 +1571,7 @@ export function AdminPanel() {
                     <thead>
                       <tr className="border-b text-muted-foreground">
                         <th className="text-left pb-3 font-medium">User</th>
+                        <th className="text-left pb-3 font-medium">Phone</th>
                         <th className="text-right pb-3 font-medium">Type</th>
                         <th className="text-right pb-3 font-medium">Amount</th>
                         <th className="text-right pb-3 font-medium">Method</th>
@@ -1577,6 +1585,19 @@ export function AdminPanel() {
                           <td className="py-3">
                             <div className="font-bold">{tx.profiles?.full_name}</div>
                             <div className="text-[10px] text-muted-foreground">{tx.profiles?.email}</div>
+                          </td>
+                          <td className="py-3">
+                            {tx.details?.user_phone ? (
+                              <div className="flex items-center gap-1">
+                                <span className="text-lg">{tx.details.user_phone_flag}</span>
+                                <div className="font-mono text-xs">
+                                  <div>{tx.details.user_phone}</div>
+                                  <div className="text-muted-foreground">{tx.details.user_country_code}</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
                           </td>
                           <td className="py-3 text-right uppercase text-xs font-bold font-mono">
                             <span className={tx.type === 'deposit' ? 'text-green-500' : 'text-red-500'}>

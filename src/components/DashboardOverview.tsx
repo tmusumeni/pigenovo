@@ -16,6 +16,7 @@ import { motion } from 'motion/react';
 
 export function DashboardOverview({ user, setActiveTab }: { user: any, setActiveTab: (tab: string) => void }) {
   const [wallet, setWallet] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [recentTrades, setRecentTrades] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [watchEarnings, setWatchEarnings] = useState({ amount: 0, count: 0 });
@@ -44,6 +45,7 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
 
   const fetchData = async () => {
     const { data: walletData } = await supabase.from('wallets').select('*').eq('user_id', user.id).single();
+    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     const { data: tradesData } = await supabase
       .from('trades')
       .select('*, news_assets(name)')
@@ -52,6 +54,7 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
       .limit(5);
     
     setWallet(walletData);
+    setProfile(profileData);
     setRecentTrades(tradesData || []);
     
     const { data: assetsData } = await supabase.from('news_assets').select('*').order('score', { ascending: false }).limit(4);
@@ -118,6 +121,44 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
           </Card>
         </motion.div>
       </div>
+
+      {/* User Profile Info with Phone Number */}
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <span className="text-2xl">{profile?.phone_flag}</span>
+            User Profile
+          </CardTitle>
+          <CardDescription>Your account information including phone number</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Full Name</div>
+                <div className="text-base font-semibold mt-1">{profile?.full_name || 'Not set'}</div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email</div>
+                <div className="text-base font-mono mt-1 text-sm">{profile?.email || user.email || 'Not set'}</div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Phone Number (Unique ID)</div>
+                <div className="text-base font-bold mt-1 flex items-center gap-2">
+                  <span className="text-xl">{profile?.phone_flag || '❓'}</span>
+                  <span className="font-mono">{profile?.phone_number ? `+${profile.country_code} ${profile.phone_number}` : 'Not set'}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Country</div>
+                <div className="text-base font-semibold mt-1">{profile?.country || 'Not specified'} ({profile?.country_code})</div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Market Overview */}
