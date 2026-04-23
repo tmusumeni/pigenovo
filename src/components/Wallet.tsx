@@ -157,7 +157,7 @@ export function Wallet({ user }: { user: any }) {
     return val;
   };
 
-  const handleTransferEarningsToWallet = async () => {
+  const handleTransferAllToWallet = async () => {
     if (earnedBalance <= 0) {
       toast.error('No earnings to transfer');
       return;
@@ -166,7 +166,7 @@ export function Wallet({ user }: { user: any }) {
     try {
       setLoading(true);
       
-      // 1. Get current wallet balance
+      // 1. Get current wallet balance (deposits only)
       const { data: wallet, error: walletError } = await supabase
         .from('wallets')
         .select('balance')
@@ -178,7 +178,7 @@ export function Wallet({ user }: { user: any }) {
       const currentBalance = Number(wallet?.balance) || 0;
       const newBalance = currentBalance + earnedBalance;
 
-      // 2. Update wallet balance
+      // 2. Update wallet balance - ADD earnings to deposits
       const { error: updateError } = await supabase
         .from('wallets')
         .update({ balance: newBalance })
@@ -196,9 +196,12 @@ export function Wallet({ user }: { user: any }) {
           amount: earnedBalance,
           currency: 'RWF',
           details: {
-            note: 'Earnings transfer to main wallet',
+            note: `Earnings transfer to main wallet. New Total: ${newBalance.toLocaleString()} RWF (Deposits: ${currentBalance.toLocaleString()} + Earnings: ${earnedBalance.toLocaleString()})`,
             timestamp: new Date().toISOString(),
             transferred_from_earnings: true,
+            original_deposits: currentBalance,
+            earnings_transferred: earnedBalance,
+            new_total_balance: newBalance,
             user_phone: profile?.phone_number,
             user_phone_flag: profile?.phone_flag,
             user_country: profile?.country,
@@ -210,8 +213,12 @@ export function Wallet({ user }: { user: any }) {
 
       if (insertError) throw insertError;
 
+      // 4. Clear the earned balance (it's now in wallet)
       setBalance(newBalance);
-      toast.success(`✅ Transferred ${earnedBalance.toLocaleString()} RWF from earnings to wallet!`);
+      setEarnedBalance(0);
+      setTotalBalance(newBalance);
+      
+      toast.success(`✅ Transfer Complete!\n\nDeposits: ${currentBalance.toLocaleString()} RWF\nEarnings: ${earnedBalance.toLocaleString()} RWF\nNew Total: ${newBalance.toLocaleString()} RWF`);
       fetchTransactions();
     } catch (error: any) {
       toast.error(error.message);
@@ -335,11 +342,11 @@ export function Wallet({ user }: { user: any }) {
                 <Button
                   size="sm"
                   className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white text-xs h-7"
-                  onClick={handleTransferEarningsToWallet}
+                  onClick={handleTransferAllToWallet}
                   disabled={loading}
                 >
                   <ArrowUpRight className="h-3 w-3 mr-1" />
-                  Transfer to Wallet
+                  Transfer to Main Wallet
                 </Button>
               )}
             </div>

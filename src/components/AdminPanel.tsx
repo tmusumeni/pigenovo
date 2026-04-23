@@ -669,9 +669,16 @@ export function AdminPanel() {
   const handleProcessFinancialRequest = async (request: any, status: 'approved' | 'rejected') => {
     try {
       setLoading(true);
-      const rwfAmount = request.details?.requested_rwf || request.amount;
       
-      // 1. Update request status
+      // Always use requested_rwf for accurate amount
+      let rwfAmount = Number(request.details?.requested_rwf || request.amount || 0);
+      
+      // Validate that we have a valid positive amount
+      if (isNaN(rwfAmount) || rwfAmount <= 0) {
+        throw new Error('Invalid amount in transaction');
+      }
+
+      // 1. Update request status in transaction record
       const { error: updateError } = await supabase
         .from('wallet_transactions')
         .update({ status })
@@ -679,51 +686,66 @@ export function AdminPanel() {
 
       if (updateError) throw updateError;
 
-      // 2. Adjust balance 
-      const { data: wallet } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', request.user_id)
-        .single();
+      // 2. Process balance changes based on transaction type and status
+      if (request.type === 'deposit' && status === 'approved') {
+        // DEPOSIT APPROVED: ADD funds to wallet
+        const { data: walletData } = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', request.user_id)
+          .single();
 
-      if (wallet) {
-        const currentBalance = Number(wallet.balance) || 0;
-        let newBalance = currentBalance;
-
-        if (request.type === 'deposit' && status === 'approved') {
-          // Add funds on approved deposit
-          newBalance = currentBalance + Number(rwfAmount);
-        } else if (request.type === 'withdrawal' && status === 'rejected') {
-          // Refund funds on rejected withdrawal (assuming they were deducted at request)
-          newBalance = currentBalance + Number(rwfAmount);
-        } else if (request.type === 'withdrawal' && status === 'approved') {
-          // Withdrawal was already deducted at request time in Wallet.tsx
-          newBalance = currentBalance;
-        }
-
-        if (newBalance !== currentBalance) {
-          const { error: walletError } = await supabase
+        if (walletData) {
+          const currentBalance = Number(walletData.balance) || 0;
+          const newBalance = currentBalance + rwfAmount; // ADD to existing balance
+          
+          const { error: updateWalletError } = await supabase
             .from('wallets')
             .update({ balance: newBalance })
             .eq('user_id', request.user_id);
           
-          if (walletError) throw walletError;
-        }
-      } else {
-        // Fallback for missing wallet - create one if it doesn't exist
-        if (request.type === 'deposit' && status === 'approved') {
-          const { error: walletError } = await supabase
+          if (updateWalletError) throw updateWalletError;
+          console.log(`✅ Deposit approved: ${currentBalance} + ${rwfAmount} = ${newBalance} RWF`);
+        } else {
+          // Create wallet if it doesn't exist
+          const { error: createError } = await supabase
             .from('wallets')
-            .insert({ user_id: request.user_id, balance: Number(rwfAmount) });
-          if (walletError) throw walletError;
+            .insert({ user_id: request.user_id, balance: rwfAmount });
+          if (createError) throw createError;
+          console.log(`✅ Wallet created with deposit: ${rwfAmount} RWF`);
+        }
+      } else if (request.type === 'withdrawal' && status === 'approved') {
+        // WITHDRAWAL APPROVED: Already deducted by user, just log
+        console.log(`✅ Withdrawal approved: ${rwfAmount} RWF removed`);
+      } else if (request.type === 'withdrawal' && status === 'rejected') {
+        // WITHDRAWAL REJECTED: REFUND the money back
+        const { data: walletData } = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', request.user_id)
+          .single();
+
+        if (walletData) {
+          const currentBalance = Number(walletData.balance) || 0;
+          const newBalance = currentBalance + rwfAmount; // ADD refund back
+          
+          const { error: updateWalletError } = await supabase
+            .from('wallets')
+            .update({ balance: newBalance })
+            .eq('user_id', request.user_id);
+          
+          if (updateWalletError) throw updateWalletError;
+          console.log(`✅ Withdrawal rejected (refunded): ${currentBalance} + ${rwfAmount} = ${newBalance} RWF`);
         }
       }
 
-      toast.success(`Request ${status} successfully`);
+      toast.success(`${request.type === 'deposit' ? 'Deposit' : 'Withdrawal'} ${status}! Balance updated.`);
       fetchFinancialRequests();
       fetchProcessedFinancials();
+      fetchStats();
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Failed to process transaction');
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
