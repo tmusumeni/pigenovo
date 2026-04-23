@@ -1497,9 +1497,13 @@ export function AdminPanel() {
                           <div className="flex gap-4">
                             <div className={cn(
                               "p-3 rounded-full",
-                              req.type === 'deposit' ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
+                              req.type === 'deposit' ? "bg-green-500/10 text-green-600" : 
+                              req.type === 'transfer' ? "bg-blue-500/10 text-blue-600" :
+                              "bg-red-500/10 text-red-600"
                             )}>
-                              {req.type === 'deposit' ? <ArrowDownLeft className="h-6 w-6" /> : <ArrowUpRight className="h-6 w-6" />}
+                              {req.type === 'deposit' ? <ArrowDownLeft className="h-6 w-6" /> : 
+                               req.type === 'transfer' ? <Coins className="h-6 w-6" /> :
+                               <ArrowUpRight className="h-6 w-6" />}
                             </div>
                             <div>
                               <h4 className="font-bold text-lg">{req.profiles?.full_name || req.profiles?.[0]?.full_name || 'User'}</h4>
@@ -1600,7 +1604,11 @@ export function AdminPanel() {
                             )}
                           </td>
                           <td className="py-3 text-right uppercase text-xs font-bold font-mono">
-                            <span className={tx.type === 'deposit' ? 'text-green-500' : 'text-red-500'}>
+                            <span className={
+                              tx.type === 'deposit' ? 'text-green-500' : 
+                              tx.type === 'transfer' ? 'text-blue-500' :
+                              'text-red-500'
+                            }>
                               {tx.type}
                             </span>
                           </td>

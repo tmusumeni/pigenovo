@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+  import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -139,6 +139,69 @@ export function Wallet({ user }: { user: any }) {
     return val;
   };
 
+  const handleTransferEarningsToWallet = async () => {
+    if (earnedBalance <= 0) {
+      toast.error('No earnings to transfer');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // 1. Get current wallet balance
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (walletError) throw walletError;
+
+      const currentBalance = Number(wallet?.balance) || 0;
+      const newBalance = currentBalance + earnedBalance;
+
+      // 2. Update wallet balance
+      const { error: updateError } = await supabase
+        .from('wallets')
+        .update({ balance: newBalance })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      // 3. Record the transfer transaction
+      const { error: insertError } = await supabase
+        .from('wallet_transactions')
+        .insert({
+          user_id: user.id,
+          type: 'transfer',
+          method: 'earnings_transfer',
+          amount: earnedBalance,
+          currency: 'RWF',
+          details: {
+            note: 'Earnings transfer to main wallet',
+            timestamp: new Date().toISOString(),
+            transferred_from_earnings: true,
+            user_phone: profile?.phone_number,
+            user_phone_flag: profile?.phone_flag,
+            user_country: profile?.country,
+            user_country_code: profile?.country_code,
+            full_name: profile?.full_name
+          },
+          status: 'approved'
+        });
+
+      if (insertError) throw insertError;
+
+      setBalance(newBalance);
+      toast.success(`✅ Transferred ${earnedBalance.toLocaleString()} RWF from earnings to wallet!`);
+      fetchTransactions();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !method) return;
@@ -250,6 +313,17 @@ export function Wallet({ user }: { user: any }) {
               <div className="text-xs font-bold text-green-700 dark:text-green-200 uppercase tracking-wider mb-2">Earnings</div>
               <div className="text-2xl font-bold text-green-900 dark:text-green-100">{earnedBalance.toLocaleString()} RWF</div>
               <p className="text-xs text-green-600 dark:text-green-400 mt-1">Watch & Share rewards</p>
+              {earnedBalance > 0 && (
+                <Button
+                  size="sm"
+                  className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white text-xs h-7"
+                  onClick={handleTransferEarningsToWallet}
+                  disabled={loading}
+                >
+                  <ArrowUpRight className="h-3 w-3 mr-1" />
+                  Transfer to Wallet
+                </Button>
+              )}
             </div>
 
             {/* Total Balance */}
