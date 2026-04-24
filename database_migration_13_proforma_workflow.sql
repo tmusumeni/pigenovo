@@ -97,7 +97,7 @@ create or replace function convert_proforma_to_invoice(
 returns uuid as $$
 declare
   v_invoice_id uuid;
-  v_proforma_record records;
+  v_proforma_record proformas%rowtype;
 begin
   -- Get proforma record
   select * into v_proforma_record from proformas 
