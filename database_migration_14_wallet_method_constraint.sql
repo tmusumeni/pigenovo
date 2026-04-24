@@ -20,12 +20,13 @@ CHECK (method IN (
   'service_charge',         -- General service charges
   'withdrawal',             -- General withdrawal
   'deposit',                -- General deposit
-  'transfer'                -- Internal transfer
+  'transfer',               -- Internal transfer
+  'earnings_transfer'       -- Transfer from earnings wallet to main wallet
 ));
 
 -- Add comment explaining all methods
 COMMENT ON CONSTRAINT wallet_transactions_method_check ON wallet_transactions 
-IS 'Payment methods: bank_transfer, wallet_payment, invoice_payment, export_fee, service_charge, withdrawal, deposit, transfer';
+IS 'Payment methods: bank_transfer, wallet_payment, invoice_payment, export_fee, service_charge, withdrawal, deposit, transfer, earnings_transfer';
 
 -- Create index on method for faster lookups
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_method ON wallet_transactions(method);
