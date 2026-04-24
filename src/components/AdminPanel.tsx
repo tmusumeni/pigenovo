@@ -56,6 +56,7 @@ export function AdminPanel() {
   // Settings Form
   const [usdtRate, setUsdtRate] = useState('1300');
   const [piRate, setPiRate] = useState('45000');
+  const [proformaExportCharge, setProformaExportCharge] = useState('1000');
   
   // Task Form
   const [taskTitle, setTaskTitle] = useState('');
@@ -91,6 +92,7 @@ export function AdminPanel() {
     fetchFinancialRequests();
     fetchProcessedFinancials();
     fetchExchangeRates();
+    fetchProformaCharge();
     fetchAllProfiles();
     fetchAllTrades();
     fetchUserWalletData();
@@ -205,6 +207,17 @@ export function AdminPanel() {
       setExchangeRates(data.value);
       setUsdtRate(data.value.usdt_rwf.toString());
       setPiRate(data.value.pi_rwf.toString());
+    }
+  };
+
+  const fetchProformaCharge = async () => {
+    try {
+      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
+      if (data) {
+        setProformaExportCharge(data.value.charge.toString());
+      }
+    } catch (error) {
+      // Use default if not set
     }
   };
 
@@ -770,6 +783,24 @@ export function AdminPanel() {
       if (error) throw error;
       toast.success('Exchange rates updated');
       fetchExchangeRates();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateProformaCharge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('settings').upsert({
+        id: 'proforma_export_charge',
+        value: { charge: Number(proformaExportCharge) }
+      });
+      if (error) throw error;
+      toast.success('Proforma export charge updated');
+      fetchProformaCharge();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -2017,6 +2048,33 @@ export function AdminPanel() {
                   <Button type="submit" className="w-full" disabled={loading}>
                     <Clock className="h-4 w-4 mr-2" />
                     {loading ? 'Updating...' : 'Update Rates'}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Proforma Export Charge</CardTitle>
+                <CardDescription>Set the charge for exporting proformas to PDF or image before conversion.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleUpdateProformaCharge} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="exportCharge">Export Charge (RWF)</Label>
+                    <Input 
+                      id="exportCharge" 
+                      type="number" 
+                      value={proformaExportCharge}
+                      onChange={(e) => setProformaExportCharge(e.target.value)}
+                      required
+                      min="0"
+                    />
+                    <p className="text-xs text-muted-foreground">Users will pay this amount when exporting proformas to PDF or image</p>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    {loading ? 'Updating...' : 'Update Charge'}
                   </Button>
                 </form>
               </CardContent>

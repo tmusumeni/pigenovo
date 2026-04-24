@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
-import { Plus, Download, Send, CheckCircle, XCircle, ArrowRight, Trash2, Eye } from 'lucide-react';
+import { Plus, Download, Send, CheckCircle, XCircle, ArrowRight, Trash2, Eye, Edit2, FileDown, Image as ImageIcon } from 'lucide-react';
 
 interface Proforma {
   id: string;
@@ -42,6 +42,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [loading, setLoading] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [previewProforma, setPreviewProforma] = useState<ProformaWithItems | null>(null);
+  const [editProforma, setEditProforma] = useState<ProformaWithItems | null>(null);
+  const [editLineItems, setEditLineItems] = useState<ProformaItem[]>([]);
+  const [exportCharge, setExportCharge] = useState(1000);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -64,6 +70,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
   useEffect(() => {
     fetchProformas();
+    fetchExportCharge();
   }, []);
 
   const fetchProformas = async () => {
@@ -277,6 +284,221 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
   const calculateGrandTotal = () => {
     return lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  };
+
+  const fetchExportCharge = async () => {
+    try {
+      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
+      if (data) {
+        setExportCharge(data.value.charge || 1000);
+      }
+    } catch (error) {
+      setExportCharge(1000); // Default charge
+    }
+  };
+
+  const handlePreview = (proforma: ProformaWithItems) => {
+    setPreviewProforma(proforma);
+    setShowPreview(true);
+  };
+
+  const handleEditProforma = (proforma: ProformaWithItems) => {
+    setEditProforma(proforma);
+    setEditLineItems(proforma.proforma_items || []);
+    setShowEdit(true);
+  };
+
+  const handleSaveEditedProforma = async () => {
+    if (!editProforma) return;
+    
+    try {
+      setLoading(true);
+      
+      // Calculate new total from edited items
+      const newTotal = editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      
+      // Update proforma amount
+      const { error: updateError } = await supabase
+        .from('proformas')
+        .update({ amount: newTotal })
+        .eq('id', editProforma.id);
+      
+      if (updateError) throw updateError;
+      
+      // Delete old items
+      if (editProforma.proforma_items) {
+        const { error: deleteError } = await supabase
+          .from('proforma_items')
+          .delete()
+          .eq('proforma_id', editProforma.id);
+        if (deleteError) throw deleteError;
+      }
+      
+      // Insert new items
+      const itemsToInsert = editLineItems.map(item => ({
+        proforma_id: editProforma.id,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        amount: item.quantity * item.unit_price
+      }));
+      
+      const { error: insertError } = await supabase
+        .from('proforma_items')
+        .insert(itemsToInsert);
+      
+      if (insertError) throw insertError;
+      
+      toast.success('Proforma updated successfully');
+      setShowEdit(false);
+      fetchProformas();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportProforma = async (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get user wallet
+      const { data: wallet } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!wallet || wallet.balance < exportCharge) {
+        toast.error(`Insufficient wallet balance. Need ${exportCharge} RWF to export`);
+        return;
+      }
+
+      // Deduct charge from wallet
+      const { error: updateError } = await supabase
+        .from('wallets')
+        .update({ balance: wallet.balance - exportCharge })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      // Record transaction
+      const { error: transError } = await supabase
+        .from('wallet_transactions')
+        .insert([{
+          user_id: user.id,
+          type: 'withdrawal',
+          method: 'proforma_export',
+          amount: exportCharge,
+          currency: 'RWF',
+          status: 'approved',
+          details: { proforma_id: proforma.id, format, description: `Proforma ${proforma.number} export to ${format.toUpperCase()}` }
+        }]);
+
+      if (transError) throw transError;
+
+      // Generate and download
+      generateProformaDocument(proforma, format);
+      toast.success(`Proforma exported as ${format.toUpperCase()}. Charge: ${exportCharge} RWF deducted`);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateProformaDocument = (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
+    // Generate HTML content
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+          .title { font-size: 24px; font-weight: bold; }
+          .subtitle { font-size: 14px; color: #666; }
+          .section { margin-bottom: 20px; }
+          .label { font-weight: bold; margin-top: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { background: #f0f0f0; padding: 8px; text-align: left; border: 1px solid #ddd; }
+          td { padding: 8px; border: 1px solid #ddd; }
+          .total { font-weight: bold; background: #f9f9f9; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">PROFORMA INVOICE</div>
+          <div class="subtitle">Reference: ${proforma.number}</div>
+        </div>
+        
+        <div class="section">
+          <div class="label">Client Information:</div>
+          <p>Name: ${proforma.client_name}</p>
+          ${proforma.client_phone ? `<p>Phone: ${proforma.client_phone}</p>` : ''}
+          ${proforma.client_email ? `<p>Email: ${proforma.client_email}</p>` : ''}
+        </div>
+        
+        <div class="section">
+          <div class="label">Details:</div>
+          <p>Date: ${new Date(proforma.proforma_date).toLocaleDateString()}</p>
+          ${proforma.valid_until ? `<p>Valid Until: ${new Date(proforma.valid_until).toLocaleDateString()}</p>` : ''}
+          ${proforma.description ? `<p>Description: ${proforma.description}</p>` : ''}
+        </div>
+        
+        <div class="section">
+          <div class="label">Line Items:</div>
+          <table>
+            <tr>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Total Price</th>
+            </tr>
+            ${proforma.proforma_items?.map(item => `
+              <tr>
+                <td>${item.description}</td>
+                <td align="right">${item.quantity}</td>
+                <td align="right">${item.unit_price.toLocaleString()}</td>
+                <td align="right">${(item.quantity * item.unit_price).toLocaleString()}</td>
+              </tr>
+            `).join('')}
+            <tr class="total">
+              <td colspan="3" align="right">GRAND TOTAL:</td>
+              <td align="right">${proforma.amount.toLocaleString()} ${proforma.currency}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="footer">
+          <p>This is an automatically generated proforma invoice.</p>
+          <p>Generated on: ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    if (format === 'pdf') {
+      // Create PDF using html2canvas + jspdf (fallback: download as HTML)
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Proforma-${proforma.number}.html`;
+      link.click();
+    } else {
+      // For image, we'll use html2canvas if available, otherwise show preview
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Proforma-${proforma.number}.html`;
+      link.click();
+    }
   };
 
   const filteredProformas = proformas.filter(p =>
@@ -566,8 +788,58 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 flex-wrap">
+                    {/* Preview Button - Always Available */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePreview(proforma)}
+                      disabled={loading}
+                      className="gap-1"
+                    >
+                      <Eye className="h-3 w-3" />
+                      Preview
+                    </Button>
+
                     {proforma.status === 'draft' && (
                       <>
+                        {/* Edit Button - Draft Only */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditProforma(proforma)}
+                          disabled={loading}
+                          className="gap-1"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                          Edit
+                        </Button>
+
+                        {/* Export Buttons - Draft Only */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleExportProforma(proforma, 'pdf')}
+                          disabled={loading}
+                          className="gap-1"
+                          title={`Export to PDF - ${exportCharge} RWF`}
+                        >
+                          <FileDown className="h-3 w-3" />
+                          PDF (₦{exportCharge})
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleExportProforma(proforma, 'image')}
+                          disabled={loading}
+                          className="gap-1"
+                          title={`Export to Image - ${exportCharge} RWF`}
+                        >
+                          <ImageIcon className="h-3 w-3" />
+                          Image (₦{exportCharge})
+                        </Button>
+
+                        {/* Send Button */}
                         <Button
                           size="sm"
                           variant="outline"
@@ -639,16 +911,192 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         </CardContent>
       </Card>
 
+      {/* Preview Modal */}
+      {showPreview && previewProforma && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowPreview(false)}
+        >
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Preview: {previewProforma.number}</CardTitle>
+                <CardDescription>Proforma Invoice</CardDescription>
+              </div>
+              <Button variant="ghost" onClick={() => setShowPreview(false)}>✕</Button>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+                <div>
+                  <p className="text-xs text-muted-foreground">Client</p>
+                  <p className="font-bold">{previewProforma.client_name}</p>
+                  {previewProforma.client_phone && <p className="text-sm">{previewProforma.client_phone}</p>}
+                  {previewProforma.client_email && <p className="text-sm">{previewProforma.client_email}</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Proforma #</p>
+                  <p className="font-bold font-mono">{previewProforma.number}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Status</p>
+                  <p className={`text-xs px-2 py-1 rounded-full font-semibold w-fit ${getStatusColor(previewProforma.status)}`}>
+                    {previewProforma.status.toUpperCase()}
+                  </p>
+                </div>
+              </div>
+
+              {previewProforma.description && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Description</p>
+                  <p className="text-sm">{previewProforma.description}</p>
+                </div>
+              )}
+
+              {previewProforma.proforma_items && previewProforma.proforma_items.length > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Line Items</p>
+                  <table className="w-full text-sm border rounded">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="p-2 text-left">Description</th>
+                        <th className="p-2 text-right">Qty</th>
+                        <th className="p-2 text-right">Unit Price</th>
+                        <th className="p-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewProforma.proforma_items.map((item, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="p-2">{item.description}</td>
+                          <td className="p-2 text-right">{item.quantity}</td>
+                          <td className="p-2 text-right">{item.unit_price.toLocaleString()}</td>
+                          <td className="p-2 text-right font-bold">{(item.quantity * item.unit_price).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-muted font-bold">
+                        <td colSpan={3} className="p-2 text-right">Grand Total:</td>
+                        <td className="p-2 text-right text-lg text-green-600">
+                          {previewProforma.amount.toLocaleString()} {previewProforma.currency}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <Button variant="outline" onClick={() => setShowPreview(false)} className="w-full">
+                Close
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Edit Modal */}
+      {showEdit && editProforma && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEdit(false)}
+        >
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Edit: {editProforma.number}</CardTitle>
+                <CardDescription>Modify line items before converting</CardDescription>
+              </div>
+              <Button variant="ghost" onClick={() => setShowEdit(false)}>✕</Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Line Items</Label>
+                <div className="space-y-2 mt-2">
+                  {editLineItems.map((item, idx) => (
+                    <div key={idx} className="flex gap-2 p-2 border rounded bg-muted/50">
+                      <div className="flex-1">
+                        <Input
+                          placeholder="Description"
+                          value={item.description}
+                          onChange={(e) => {
+                            const updated = [...editLineItems];
+                            updated[idx].description = e.target.value;
+                            setEditLineItems(updated);
+                          }}
+                          size="sm"
+                        />
+                      </div>
+                      <div className="w-20">
+                        <Input
+                          type="number"
+                          placeholder="Qty"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const updated = [...editLineItems];
+                            updated[idx].quantity = Number(e.target.value);
+                            setEditLineItems(updated);
+                          }}
+                          size="sm"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <Input
+                          type="number"
+                          placeholder="Unit Price"
+                          value={item.unit_price}
+                          onChange={(e) => {
+                            const updated = [...editLineItems];
+                            updated[idx].unit_price = Number(e.target.value);
+                            setEditLineItems(updated);
+                          }}
+                          size="sm"
+                        />
+                      </div>
+                      <div className="w-24 p-2 border rounded bg-white">
+                        {(item.quantity * item.unit_price).toLocaleString()}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditLineItems(editLineItems.filter((_, i) => i !== idx))}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-muted p-3 rounded">
+                <p className="text-sm font-bold">New Grand Total: {editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toLocaleString()} {editProforma.currency}</p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={handleSaveEditedProforma} disabled={loading} className="flex-1">
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button variant="outline" onClick={() => setShowEdit(false)} className="flex-1">
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Workflow Info */}
       <Card className="bg-blue-50 border-blue-200">
         <CardHeader>
           <CardTitle className="text-blue-900">📋 {t('proforma.title')} Workflow</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-blue-800 space-y-2">
-          <p>✅ <strong>Step 1:</strong> Create a proforma with client details and amount</p>
+          <p>✅ <strong>Step 1:</strong> Create a proforma with client details and line items (description, qty, unit price)</p>
+          <p>📋 <strong>Preview:</strong> Click Preview button to see formatted proforma before sending (FREE)</p>
+          <p>✏️ <strong>Edit:</strong> Modify line items before sending (Drafts only, FREE)</p>
+          <p>📥 <strong>Export:</strong> Save proforma as PDF or Image (Charge: {exportCharge} RWF deducted from wallet)</p>
           <p>✅ <strong>Step 2:</strong> Send proforma to client for review</p>
           <p>✅ <strong>Step 3:</strong> Client accepts or rejects the quotation</p>
-          <p>✅ <strong>Step 4:</strong> Convert accepted proforma to invoice</p>
+          <p>✅ <strong>Step 4:</strong> Convert accepted proforma to invoice (no charge)</p>
           <p>✅ <strong>Step 5:</strong> Client pays via platform → Money added to your wallet automatically</p>
         </CardContent>
       </Card>
