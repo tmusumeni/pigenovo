@@ -58,6 +58,21 @@ export const translations: Record<Language, Record<string, string>> = {
     'invoices.send_reminder': 'Ohereza n\'icyo cyizindagurutse',
     'invoices.empty': 'Nta fakitire ifite',
     
+    // Proforma
+    'proforma.title': 'Proformas',
+    'proforma.new': 'Proforma nshya',
+    'proforma.number': 'Umubare wa proforma',
+    'proforma.convert_to_invoice': 'Guhindura kuri invoice',
+    'proforma.status.draft': 'Imigaragaro',
+    'proforma.status.sent': 'Yoherejwe',
+    'proforma.status.accepted': 'Yemejwe',
+    'proforma.status.rejected': 'Yanyuwe',
+    'proforma.status.converted': 'Yatanzwe',
+    'proforma.valid_until': 'Ibyemezo bitangira',
+    'proforma.accept_quotation': 'Kwemeza quotation',
+    'proforma.reject_quotation': 'Gucnya quotation',
+    'proforma.empty': 'Nta proforma ifite',
+    
     // Reports
     'reports.title': 'Raporo',
     'reports.period': 'Igihe',
@@ -128,6 +143,21 @@ export const translations: Record<Language, Record<string, string>> = {
     'invoices.mark_paid': 'Weka Alama Kama Imelipiwa',
     'invoices.send_reminder': 'Tuma Ukumbusho',
     'invoices.empty': 'Hakuna ankara',
+    
+    // Proforma
+    'proforma.title': 'Zabuni',
+    'proforma.new': 'Zabuni Mpya',
+    'proforma.number': 'Namba ya Zabuni',
+    'proforma.convert_to_invoice': 'Badilisha kuwa Ankara',
+    'proforma.status.draft': 'Rasimu',
+    'proforma.status.sent': 'Imetumwa',
+    'proforma.status.accepted': 'Imekubali',
+    'proforma.status.rejected': 'Imekataa',
+    'proforma.status.converted': 'Imebadilishwa',
+    'proforma.valid_until': 'Halali hadi',
+    'proforma.accept_quotation': 'Kubali Zabuni',
+    'proforma.reject_quotation': 'Kataa Zabuni',
+    'proforma.empty': 'Hakuna zabuni',
     
     // Reports
     'reports.title': 'Ripoti',
@@ -200,6 +230,21 @@ export const translations: Record<Language, Record<string, string>> = {
     'invoices.send_reminder': 'Send Reminder',
     'invoices.empty': 'No invoices yet',
     
+    // Proforma
+    'proforma.title': 'Proformas',
+    'proforma.new': 'New Proforma',
+    'proforma.number': 'Proforma Number',
+    'proforma.convert_to_invoice': 'Convert to Invoice',
+    'proforma.status.draft': 'Draft',
+    'proforma.status.sent': 'Sent',
+    'proforma.status.accepted': 'Accepted',
+    'proforma.status.rejected': 'Rejected',
+    'proforma.status.converted': 'Converted',
+    'proforma.valid_until': 'Valid Until',
+    'proforma.accept_quotation': 'Accept Quotation',
+    'proforma.reject_quotation': 'Reject Quotation',
+    'proforma.empty': 'No proformas yet',
+    
     // Reports
     'reports.title': 'Reports',
     'reports.period': 'Period',
@@ -270,6 +315,21 @@ export const translations: Record<Language, Record<string, string>> = {
     'invoices.mark_paid': 'Marquer comme Payé',
     'invoices.send_reminder': 'Envoyer un Rappel',
     'invoices.empty': 'Aucune facture',
+    
+    // Proforma
+    'proforma.title': 'Devis',
+    'proforma.new': 'Nouveau Devis',
+    'proforma.number': 'Numéro de Devis',
+    'proforma.convert_to_invoice': 'Convertir en Facture',
+    'proforma.status.draft': 'Brouillon',
+    'proforma.status.sent': 'Envoyé',
+    'proforma.status.accepted': 'Accepté',
+    'proforma.status.rejected': 'Rejeté',
+    'proforma.status.converted': 'Converti',
+    'proforma.valid_until': 'Valide jusqu\'au',
+    'proforma.accept_quotation': 'Accepter le Devis',
+    'proforma.reject_quotation': 'Rejeter le Devis',
+    'proforma.empty': 'Aucun devis',
     
     // Reports
     'reports.title': 'Rapports',

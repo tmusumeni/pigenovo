@@ -7,6 +7,7 @@ import { WatchEarn } from './WatchEarn';
 import { AIAssistant } from './AIAssistant';
 import { AdminPanel } from './AdminPanel';
 import { Wallet } from './Wallet';
+import { Proformas } from './Proformas';
 import { Invoices } from './Invoices';
 import { Reports } from './Reports';
 import { LanguageSelector } from './LanguageSelector';
@@ -74,6 +75,8 @@ export function Dashboard({ user }: { user: any }) {
         return <AIAssistant user={user} />;
       case 'wallet':
         return <Wallet user={user} />;
+      case 'proformas':
+        return <Proformas setActiveTab={setActiveTab} />;
       case 'invoices':
         return <Invoices />;
       case 'reports':

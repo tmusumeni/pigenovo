@@ -194,6 +194,15 @@ export function Invoices() {
 
       if (invoiceError) throw invoiceError;
 
+      // Credit the invoice owner's wallet (seller)
+      const { error: creditError } = await supabase.rpc('credit_wallet_on_invoice_payment', {
+        p_invoice_id: invoice.id,
+        p_user_id: invoice.user_id,
+        p_amount: invoice.amount
+      });
+
+      if (creditError) throw creditError;
+
       toast.success(t('wallet.payment_successful'));
       setWalletBalance(newBalance);
       fetchInvoices();
