@@ -5,9 +5,26 @@
   Run this in your Supabase SQL Editor to fix export fee recording
 */
 
--- Drop existing method constraint if it exists
+-- First, drop existing method constraint if it exists
 ALTER TABLE wallet_transactions
 DROP CONSTRAINT IF EXISTS wallet_transactions_method_check;
+
+-- Clean up any rows with NULL or invalid method values
+-- Set them to 'service_charge' as a safe default
+UPDATE wallet_transactions
+SET method = 'service_charge'
+WHERE method IS NULL 
+   OR method NOT IN (
+     'bank_transfer',
+     'wallet_payment',
+     'invoice_payment',
+     'export_fee',
+     'service_charge',
+     'withdrawal',
+     'deposit',
+     'transfer',
+     'earnings_transfer'
+   );
 
 -- Add comprehensive method constraint with all supported methods
 ALTER TABLE wallet_transactions
