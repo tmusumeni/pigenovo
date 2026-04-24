@@ -8,7 +8,9 @@ import {
   ShieldCheck, 
   LogOut,
   Zap,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -51,6 +53,8 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
     { id: 'trading', label: 'Exchange', icon: TrendingUp },
     { id: 'watch-earn', label: 'Watch & Earn', icon: PlayCircle },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
+    { id: 'invoices', label: 'Invoices', icon: FileText },
+    { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'ai-assistant', label: 'AI Assistant', icon: MessageSquare },
   ];
 

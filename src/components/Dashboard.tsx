@@ -7,6 +7,9 @@ import { WatchEarn } from './WatchEarn';
 import { AIAssistant } from './AIAssistant';
 import { AdminPanel } from './AdminPanel';
 import { Wallet } from './Wallet';
+import { Invoices } from './Invoices';
+import { Reports } from './Reports';
+import { LanguageSelector } from './LanguageSelector';
 import { RealtimeFeed } from './RealtimeFeed';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, Search, User } from 'lucide-react';
@@ -71,6 +74,10 @@ export function Dashboard({ user }: { user: any }) {
         return <AIAssistant user={user} />;
       case 'wallet':
         return <Wallet user={user} />;
+      case 'invoices':
+        return <Invoices />;
+      case 'reports':
+        return <Reports />;
       case 'admin':
         return <AdminPanel />;
       default:
@@ -98,6 +105,7 @@ export function Dashboard({ user }: { user: any }) {
           </div>
           
           <div className="flex items-center gap-4">
+            <LanguageSelector />
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-card" />
