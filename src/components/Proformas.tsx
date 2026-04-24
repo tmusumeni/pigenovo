@@ -120,13 +120,23 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       if (error) throw error;
       
-      // Ensure all proformas have calculated totals
-      const processedData = (data || []).map(proforma => ({
-        ...proforma,
-        discount_amount: proforma.discount_amount || 0,
-        tax_amount: proforma.tax_amount || 0,
-        total_amount: proforma.total_amount || proforma.amount || 0
-      }));
+      // Ensure all proformas have all required fields with defaults
+      const processedData = (data || []).map(proforma => {
+        const subtotal = proforma.amount || 0;
+        const discountAmount = proforma.discount_amount !== null && proforma.discount_amount !== undefined ? proforma.discount_amount : 0;
+        const taxAmount = proforma.tax_amount !== null && proforma.tax_amount !== undefined ? proforma.tax_amount : 0;
+        const totalAmount = proforma.total_amount !== null && proforma.total_amount !== undefined ? proforma.total_amount : (proforma.amount || 0);
+        
+        return {
+          ...proforma,
+          amount: subtotal,
+          discount_amount: discountAmount,
+          tax_amount: taxAmount,
+          total_amount: totalAmount,
+          discount_rate: proforma.discount_rate || 0,
+          tax_rate: proforma.tax_rate || 0
+        };
+      });
       
       setProformas(processedData);
     } catch (error: any) {
@@ -183,23 +193,26 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         throw proformaError;
       }
 
-      // After proforma is created, try to update with tax/discount values
+      // After proforma is created, update with tax/discount values (always save these)
       // This will succeed if migrations have been run
-      const updateData: any = {};
-      if (formData.tax_rate) updateData.tax_rate = formData.tax_rate;
-      if (formData.discount_rate) updateData.discount_rate = formData.discount_rate;
-      if (formData.tax_rate || formData.discount_rate) {
-        updateData.tax_amount = totals.taxAmount;
-        updateData.discount_amount = totals.discountAmount;
-        updateData.total_amount = totals.total;
+      const updateData: any = {
+        tax_rate: formData.tax_rate || 0,
+        discount_rate: formData.discount_rate || 0,
+        tax_amount: totals.taxAmount,
+        discount_amount: totals.discountAmount,
+        total_amount: totals.total
+      };
 
-        await supabase
-          .from('proformas')
-          .update(updateData)
-          .eq('id', proformaData.id)
-          .then(result => {
-            // If update fails due to missing columns, that's OK - continues anyway
-          });
+      const { error: updateError } = await supabase
+        .from('proformas')
+        .update(updateData)
+        .eq('id', proformaData.id);
+
+      if (updateError) {
+        // If update fails due to missing columns, continue anyway (migrations not run yet)
+        if (!updateError.message.includes('discount_amount') && !updateError.message.includes('tax_amount')) {
+          console.warn('Warning: Could not save tax/discount values:', updateError.message);
+        }
       }
 
       // Create line items
@@ -422,12 +435,23 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       setLoading(true);
       
       // Calculate new total from edited items
-      const newTotal = editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      const newSubtotal = editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
       
-      // Update proforma amount
+      // Recalculate tax and discount based on new subtotal
+      const discountAmount = (newSubtotal * (editProforma.discount_rate || 0)) / 100;
+      const discountedAmount = newSubtotal - discountAmount;
+      const taxAmount = (discountedAmount * (editProforma.tax_rate || 0)) / 100;
+      const finalTotal = discountedAmount + taxAmount;
+      
+      // Update proforma amount and recalculated tax/discount/total
       const { error: updateError } = await supabase
         .from('proformas')
-        .update({ amount: newTotal })
+        .update({ 
+          amount: newSubtotal,
+          discount_amount: discountAmount,
+          tax_amount: taxAmount,
+          total_amount: finalTotal
+        })
         .eq('id', editProforma.id);
       
       if (updateError) throw updateError;
@@ -456,7 +480,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       
       if (insertError) throw insertError;
       
-      toast.success('Proforma updated successfully');
+      toast.success('✅ Proforma updated successfully with new totals');
       setShowEdit(false);
       fetchProformas();
     } catch (error: any) {
