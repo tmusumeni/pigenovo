@@ -218,7 +218,7 @@ export function AdminPanel() {
       
       if (error) {
         console.error('Error fetching profiles with wallets:', error);
-        // Fallback: Fetch profiles first, then wallets if join fails
+        // Fallback: Fetch profiles and wallets separately
         const { data: profilesOnly, error: pError } = await supabase
           .from('profiles')
           .select('id, email, full_name, phone_number, country, country_code, phone_flag, role, created_at')
@@ -231,12 +231,19 @@ export function AdminPanel() {
         
         const mappedProfiles = (profilesOnly || []).map(p => ({
           ...p,
-          wallets: allWallets ? allWallets.filter(w => w.user_id === p.id) : []
+          wallets: allWallets ? [{ balance: allWallets.find(w => w.user_id === p.id)?.balance || 0 }] : [{ balance: 0 }]
         }));
         
+        console.log('Fallback profiles loaded:', mappedProfiles);
         setAllProfiles(mappedProfiles);
       } else {
-        setAllProfiles(data || []);
+        // Ensure wallets always has correct structure
+        const normalizedData = (data || []).map(p => ({
+          ...p,
+          wallets: Array.isArray(p.wallets) ? p.wallets : [{ balance: 0 }]
+        }));
+        console.log('Profiles loaded:', normalizedData);
+        setAllProfiles(normalizedData);
       }
     } catch (err) {
       console.error('Fetch error profiles:', err);
@@ -823,7 +830,7 @@ export function AdminPanel() {
     const newPhone = prompt(`Enter new phone number (current: ${currentPhone || 'None'}):`, currentPhone || '250788984216');
     if (!newPhone) return;
 
-    // Sample country mapping (same as registration form)
+    // Country mapping
     const countryMap: Record<string, {name: string; flag: string}> = {
       'RW': { name: 'Rwanda', flag: '🇷🇼' },
       'UG': { name: 'Uganda', flag: '🇺🇬' },
@@ -850,7 +857,7 @@ export function AdminPanel() {
       setLoading(true);
       
       // Update the profile with new phone data
-      const { error, data } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ 
           phone_number: newPhone,
@@ -858,30 +865,14 @@ export function AdminPanel() {
           country_code: newCountryCode,
           phone_flag: country.flag
         })
-        .eq('id', userId)
-        .select();
+        .eq('id', userId);
       
       if (error) throw error;
       
       toast.success(`✅ Phone number updated to ${newPhone} (${country.flag} ${newCountryCode})`);
       
-      // Manually update the profile in state first for immediate UI update
-      setAllProfiles(prevProfiles => 
-        prevProfiles.map(p => 
-          p.id === userId 
-            ? {
-                ...p,
-                phone_number: newPhone,
-                country: country.name,
-                country_code: newCountryCode,
-                phone_flag: country.flag
-              }
-            : p
-        )
-      );
-      
-      // Then fetch fresh data from server
-      setTimeout(() => fetchAllProfiles(), 500);
+      // Refresh data from server
+      await fetchAllProfiles();
     } catch (error: any) {
       toast.error(error.message || 'Failed to update phone number');
     } finally {
@@ -1930,13 +1921,13 @@ export function AdminPanel() {
                             <div className="text-[10px] text-muted-foreground/50 font-mono mt-0.5">{profile.id}</div>
                           </td>
                           <td className="py-4">
-                            {profile.phone_number ? (
+                            {profile && profile.phone_number && profile.phone_number.trim() ? (
                               <div className="flex items-center gap-2">
                                 <span className="text-lg">{profile.phone_flag || '🌍'}</span>
                                 <div>
                                   <div className="font-mono font-bold text-sm">{profile.phone_number}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {profile.country || 'N/A'} {profile.country_code ? `(${profile.country_code})` : ''}
+                                    {profile.country || 'Unknown'} {profile.country_code ? `(${profile.country_code})` : ''}
                                   </div>
                                 </div>
                               </div>
