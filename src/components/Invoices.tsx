@@ -24,6 +24,11 @@ interface Invoice {
   due_date?: string;
   payment_method?: string;
   paid_date?: string;
+  tax_rate?: number;
+  discount_rate?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_amount?: number;
   created_at: string;
 }
 
@@ -406,7 +411,24 @@ export function Invoices() {
                       <span className="text-sm text-muted-foreground">{invoice.client_name}</span>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      {invoice.amount.toLocaleString()} {invoice.currency}
+                      <div>
+                        Subtotal: {invoice.amount.toLocaleString()} {invoice.currency}
+                      </div>
+                      {invoice.discount_rate ? (
+                        <div className="text-orange-600">
+                          Discount ({invoice.discount_rate}%): -{invoice.discount_amount?.toLocaleString() || '0'} {invoice.currency}
+                        </div>
+                      ) : null}
+                      {invoice.tax_rate ? (
+                        <div className="text-blue-600">
+                          Tax ({invoice.tax_rate}%): +{invoice.tax_amount?.toLocaleString() || '0'} {invoice.currency}
+                        </div>
+                      ) : null}
+                      {(invoice.tax_rate || invoice.discount_rate) && (
+                        <div className="font-bold text-green-600 mt-1">
+                          Total: {invoice.total_amount?.toLocaleString() || invoice.amount.toLocaleString()} {invoice.currency}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-2">

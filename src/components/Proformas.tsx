@@ -61,6 +61,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     currency: 'RWF',
     description: '',
     valid_until: '',
+    tax_rate: 0,
+    discount_rate: 0,
   });
 
   // Line items
@@ -143,8 +145,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Calculate total amount from line items
-      const totalAmount = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      // Calculate total with tax and discount
+      const totals = calculateTotalWithTaxAndDiscount();
 
       // Create proforma
       const { data: proformaData, error: proformaError } = await supabase
@@ -155,11 +157,16 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           client_name: formData.client_name,
           client_phone: formData.client_phone,
           client_email: formData.client_email,
-          amount: totalAmount,
+          amount: totals.subtotal,
           currency: formData.currency,
           description: formData.description,
           valid_until: formData.valid_until || null,
-          status: 'draft'
+          status: 'draft',
+          tax_rate: formData.tax_rate,
+          discount_rate: formData.discount_rate,
+          tax_amount: totals.taxAmount,
+          discount_amount: totals.discountAmount,
+          total_amount: totals.total
         }])
         .select()
         .single();
@@ -190,6 +197,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         currency: 'RWF',
         description: '',
         valid_until: '',
+        tax_rate: 0,
+        discount_rate: 0,
       });
       setLineItems([]);
       setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
@@ -320,6 +329,22 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
   const calculateGrandTotal = () => {
     return lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  };
+
+  const calculateTotalWithTaxAndDiscount = () => {
+    const subtotal = calculateGrandTotal();
+    const discountAmount = (subtotal * formData.discount_rate) / 100;
+    const discountedAmount = subtotal - discountAmount;
+    const taxAmount = (discountedAmount * formData.tax_rate) / 100;
+    const total = discountedAmount + taxAmount;
+    
+    return {
+      subtotal,
+      discountAmount: Math.round(discountAmount * 100) / 100,
+      discountedAmount: Math.round(discountedAmount * 100) / 100,
+      taxAmount: Math.round(taxAmount * 100) / 100,
+      total: Math.round(total * 100) / 100
+    };
   };
 
   const fetchExportCharge = async () => {
@@ -750,15 +775,80 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                           ))}
                           <tr className="border-t bg-muted font-bold">
                             <td colSpan={3} className="p-3 text-right">
-                              Grand Total:
+                              Subtotal:
                             </td>
-                            <td className="p-3 text-right text-lg text-green-600">
-                              {calculateGrandTotal().toLocaleString()} {formData.currency}
+                            <td className="p-3 text-right text-lg">
+                              {calculateTotalWithTaxAndDiscount().subtotal.toLocaleString()} {formData.currency}
                             </td>
                             <td></td>
                           </tr>
                         </tbody>
                       </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tax & Discount Section */}
+                <div className="border-b pb-4">
+                  <h3 className="font-bold mb-4">Tax & Discount</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Discount Rate (%)</Label>
+                      <Input
+                        type="number"
+                        value={formData.discount_rate}
+                        onChange={(e) => setFormData({ ...formData, discount_rate: Number(e.target.value) })}
+                        placeholder="0"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Discount: {calculateTotalWithTaxAndDiscount().discountAmount.toLocaleString()} {formData.currency}
+                      </p>
+                    </div>
+                    <div>
+                      <Label>Tax Rate (%) - For Government</Label>
+                      <Input
+                        type="number"
+                        value={formData.tax_rate}
+                        onChange={(e) => setFormData({ ...formData, tax_rate: Number(e.target.value) })}
+                        placeholder="0"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Tax: {calculateTotalWithTaxAndDiscount().taxAmount.toLocaleString()} {formData.currency}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Final Total Display */}
+                  {lineItems.length > 0 && (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>Subtotal:</span>
+                          <span className="font-semibold">{calculateTotalWithTaxAndDiscount().subtotal.toLocaleString()} {formData.currency}</span>
+                        </div>
+                        {formData.discount_rate > 0 && (
+                          <div className="flex justify-between text-orange-600">
+                            <span>Discount ({formData.discount_rate}%):</span>
+                            <span className="font-semibold">-{calculateTotalWithTaxAndDiscount().discountAmount.toLocaleString()} {formData.currency}</span>
+                          </div>
+                        )}
+                        {formData.tax_rate > 0 && (
+                          <div className="flex justify-between text-blue-600">
+                            <span>Tax ({formData.tax_rate}%):</span>
+                            <span className="font-semibold">+{calculateTotalWithTaxAndDiscount().taxAmount.toLocaleString()} {formData.currency}</span>
+                          </div>
+                        )}
+                        <div className="border-t pt-2 flex justify-between text-lg font-bold text-green-600">
+                          <span>Final Total:</span>
+                          <span>{calculateTotalWithTaxAndDiscount().total.toLocaleString()} {formData.currency}</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
