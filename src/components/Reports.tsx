@@ -29,7 +29,7 @@ export function Reports() {
   const { t } = useLanguage();
   const [reports, setReports] = useState<ReportData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [periodType, setPeriodType] = useState<'this_month' | 'last_month' | 'this_year' | 'custom'>('this_month');
+  const [periodType, setPeriodType] = useState<'monthly' | 'yearly' | 'custom'>('monthly');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentReport, setCurrentReport] = useState<ReportData | null>(null);
@@ -83,13 +83,29 @@ export function Reports() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Set date range based on period type
+      let finalStartDate = startDate;
+      let finalEndDate = endDate;
+
+      if (periodType === 'monthly') {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        finalStartDate = firstDay.toISOString().split('T')[0];
+        finalEndDate = today.toISOString().split('T')[0];
+      } else if (periodType === 'yearly') {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), 0, 1);
+        finalStartDate = firstDay.toISOString().split('T')[0];
+        finalEndDate = today.toISOString().split('T')[0];
+      }
+
       // Fetch invoices for the period
       const { data: invoices, error: invoiceError } = await supabase
         .from('invoices')
         .select('*')
         .eq('user_id', user.id)
-        .gte('invoice_date', startDate)
-        .lte('invoice_date', endDate);
+        .gte('invoice_date', finalStartDate)
+        .lte('invoice_date', finalEndDate);
 
       if (invoiceError) throw invoiceError;
 
@@ -111,8 +127,8 @@ export function Reports() {
         .insert([{
           user_id: user.id,
           report_type: periodType,
-          start_date: startDate,
-          end_date: endDate,
+          start_date: finalStartDate,
+          end_date: finalEndDate,
           ...stats
         }]);
 
@@ -181,9 +197,8 @@ export function Reports() {
                     onChange={(e) => setPeriodType(e.target.value as any)}
                     className="w-full p-2 border rounded"
                   >
-                    <option value="this_month">{t('reports.period.this_month')}</option>
-                    <option value="last_month">{t('reports.period.last_month')}</option>
-                    <option value="this_year">{t('reports.period.this_year')}</option>
+                    <option value="monthly">{t('reports.period.this_month')}</option>
+                    <option value="yearly">{t('reports.period.this_year')}</option>
                     <option value="custom">{t('reports.period.custom')}</option>
                   </select>
                 </div>

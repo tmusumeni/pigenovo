@@ -24,9 +24,21 @@ interface Proforma {
   created_at: string;
 }
 
+interface ProformaItem {
+  id?: string;
+  proforma_id?: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+}
+
+interface ProformaWithItems extends Proforma {
+  proforma_items?: ProformaItem[];
+}
+
 export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { t } = useLanguage();
-  const [proformas, setProformas] = useState<Proforma[]>([]);
+  const [proformas, setProformas] = useState<ProformaWithItems[]>([]);
   const [loading, setLoading] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,10 +49,17 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     client_name: '',
     client_phone: '',
     client_email: '',
-    amount: '',
     currency: 'RWF',
     description: '',
     valid_until: '',
+  });
+
+  // Line items
+  const [lineItems, setLineItems] = useState<ProformaItem[]>([]);
+  const [currentItem, setCurrentItem] = useState<ProformaItem>({
+    description: '',
+    quantity: 1,
+    unit_price: 0,
   });
 
   useEffect(() => {
@@ -55,7 +74,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       const { data, error } = await supabase
         .from('proformas')
-        .select('*')
+        .select('*, proforma_items(*)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -71,7 +90,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const handleCreateProforma = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.number || !formData.client_name || !formData.amount) {
+    if (!formData.number || !formData.client_name || lineItems.length === 0) {
       toast.error(t('common.error'));
       return;
     }
@@ -81,7 +100,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase
+      // Calculate total amount from line items
+      const totalAmount = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+
+      // Create proforma
+      const { data: proformaData, error: proformaError } = await supabase
         .from('proformas')
         .insert([{
           user_id: user.id,
@@ -89,14 +112,31 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           client_name: formData.client_name,
           client_phone: formData.client_phone,
           client_email: formData.client_email,
-          amount: Number(formData.amount),
+          amount: totalAmount,
           currency: formData.currency,
           description: formData.description,
           valid_until: formData.valid_until || null,
           status: 'draft'
-        }]);
+        }])
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (proformaError) throw proformaError;
+
+      // Create line items
+      const itemsToInsert = lineItems.map(item => ({
+        proforma_id: proformaData.id,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        amount: item.quantity * item.unit_price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('proforma_items')
+        .insert(itemsToInsert);
+
+      if (itemsError) throw itemsError;
       
       toast.success(`${t('proforma.new')} ${t('common.success')}`);
       setFormData({
@@ -104,11 +144,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         client_name: '',
         client_phone: '',
         client_email: '',
-        amount: '',
         currency: 'RWF',
         description: '',
         valid_until: '',
       });
+      setLineItems([]);
+      setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
       setShowNew(false);
       fetchProformas();
     } catch (error: any) {
@@ -221,6 +262,23 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
+  const handleAddLineItem = () => {
+    if (!currentItem.description || currentItem.quantity <= 0 || currentItem.unit_price <= 0) {
+      toast.error('Please fill all item fields');
+      return;
+    }
+    setLineItems([...lineItems, { ...currentItem }]);
+    setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
+  };
+
+  const handleRemoveLineItem = (index: number) => {
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const calculateGrandTotal = () => {
+    return lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  };
+
   const filteredProformas = proformas.filter(p =>
     p.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -257,67 +315,183 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateProforma} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>{t('proforma.number')}</Label>
-                    <Input
-                      value={formData.number}
-                      onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                      placeholder="PRO-001"
-                      required
-                    />
+                {/* Client Info Section */}
+                <div className="border-b pb-4">
+                  <h3 className="font-bold mb-4">Client Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>{t('proforma.number')}</Label>
+                      <Input
+                        value={formData.number}
+                        onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                        placeholder="PRO-001"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label>{t('invoices.client_name')}</Label>
+                      <Input
+                        value={formData.client_name}
+                        onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                        placeholder={t('invoices.client_name')}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label>{t('invoices.client_phone')}</Label>
+                      <Input
+                        value={formData.client_phone}
+                        onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
+                        placeholder="+250..."
+                      />
+                    </div>
+                    <div>
+                      <Label>{t('invoices.client_email')}</Label>
+                      <Input
+                        type="email"
+                        value={formData.client_email}
+                        onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
+                        placeholder="client@example.com"
+                      />
+                    </div>
+                    <div>
+                      <Label>Currency</Label>
+                      <select
+                        value={formData.currency}
+                        onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                        className="w-full p-2 border rounded"
+                      >
+                        <option value="RWF">RWF</option>
+                        <option value="USDT">USDT</option>
+                        <option value="PI">PI</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label>{t('proforma.valid_until')}</Label>
+                      <Input
+                        type="date"
+                        value={formData.valid_until}
+                        onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label>{t('invoices.client_name')}</Label>
-                    <Input
-                      value={formData.client_name}
-                      onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
-                      placeholder={t('invoices.client_name')}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>{t('invoices.client_phone')}</Label>
-                    <Input
-                      value={formData.client_phone}
-                      onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
-                      placeholder="+250..."
-                    />
-                  </div>
-                  <div>
-                    <Label>{t('invoices.amount')}</Label>
-                    <Input
-                      type="number"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>{t('proforma.valid_until')}</Label>
-                    <Input
-                      type="date"
-                      value={formData.valid_until}
-                      onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
+                  <div className="mt-4">
+                    <Label>{t('invoices.description')}</Label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder={t('invoices.description')}
+                      className="w-full p-2 border rounded"
+                      rows={3}
                     />
                   </div>
                 </div>
-                <div>
-                  <Label>{t('invoices.description')}</Label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder={t('invoices.description')}
-                    className="w-full p-2 border rounded"
-                    rows={3}
-                  />
+
+                {/* Line Items Section */}
+                <div className="border-b pb-4">
+                  <h3 className="font-bold mb-4">Line Items</h3>
+                  <div className="grid grid-cols-5 gap-2 mb-4">
+                    <div>
+                      <Label>Description</Label>
+                      <Input
+                        value={currentItem.description}
+                        onChange={(e) => setCurrentItem({ ...currentItem, description: e.target.value })}
+                        placeholder="Item description"
+                      />
+                    </div>
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        value={currentItem.quantity}
+                        onChange={(e) => setCurrentItem({ ...currentItem, quantity: Number(e.target.value) })}
+                        placeholder="1"
+                        min="1"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <Label>Unit Price</Label>
+                      <Input
+                        type="number"
+                        value={currentItem.unit_price}
+                        onChange={(e) => setCurrentItem({ ...currentItem, unit_price: Number(e.target.value) })}
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <Label>Total Price</Label>
+                      <div className="p-2 border rounded bg-muted">
+                        {(currentItem.quantity * currentItem.unit_price).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex items-end">
+                      <Button type="button" onClick={handleAddLineItem} className="w-full">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Line Items Table */}
+                  {lineItems.length > 0 && (
+                    <div className="border rounded-lg overflow-hidden mb-4">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="p-3 text-left">Description</th>
+                            <th className="p-3 text-right">Quantity</th>
+                            <th className="p-3 text-right">Unit Price</th>
+                            <th className="p-3 text-right">Total Price</th>
+                            <th className="p-3 text-center">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {lineItems.map((item, index) => (
+                            <tr key={index} className="border-t">
+                              <td className="p-3">{item.description}</td>
+                              <td className="p-3 text-right">{item.quantity}</td>
+                              <td className="p-3 text-right">{item.unit_price.toLocaleString()}</td>
+                              <td className="p-3 text-right font-bold">
+                                {(item.quantity * item.unit_price).toLocaleString()}
+                              </td>
+                              <td className="p-3 text-center">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveLineItem(index)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="border-t bg-muted font-bold">
+                            <td colSpan={3} className="p-3 text-right">
+                              Grand Total:
+                            </td>
+                            <td className="p-3 text-right text-lg text-green-600">
+                              {calculateGrandTotal().toLocaleString()} {formData.currency}
+                            </td>
+                            <td></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
+
                 <div className="flex gap-2">
-                  <Button type="submit" disabled={loading}>
+                  <Button type="submit" disabled={loading || lineItems.length === 0}>
                     {t('common.save')}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowNew(false)}>
+                  <Button type="button" variant="outline" onClick={() => {
+                    setShowNew(false);
+                    setLineItems([]);
+                    setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
+                  }}>
                     {t('common.cancel')}
                   </Button>
                 </div>
@@ -370,6 +544,22 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       </p>
                       {proforma.description && (
                         <p className="text-xs text-muted-foreground mt-1">{proforma.description}</p>
+                      )}
+
+                      {/* Line Items Display */}
+                      {proforma.proforma_items && proforma.proforma_items.length > 0 && (
+                        <div className="mt-3 text-xs">
+                          <div className="border-t pt-2">
+                            {proforma.proforma_items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between py-1 px-2 bg-muted/50 rounded mb-1">
+                                <span>{item.description}</span>
+                                <span className="text-right">
+                                  {item.quantity} × {item.unit_price.toLocaleString()} = {(item.quantity * item.unit_price).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
