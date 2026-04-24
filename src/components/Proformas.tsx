@@ -428,11 +428,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         .insert([{
           user_id: user.id,
           type: 'withdrawal',
-          method: 'proforma_export',
+          method: 'export_fee',
           amount: exportCharge,
           currency: 'RWF',
           status: 'approved',
-          details: { proforma_id: proforma.id, format, description: `Proforma ${proforma.number} export to ${format.toUpperCase()}` }
+          details: { proforma_id: proforma.id, format, description: `Proforma ${proforma.number} export to ${format.toUpperCase()}`, fee_type: 'proforma_export' }
         }]);
 
       if (transError) throw transError;
