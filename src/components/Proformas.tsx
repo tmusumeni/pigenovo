@@ -119,7 +119,16 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProformas(data || []);
+      
+      // Ensure all proformas have calculated totals
+      const processedData = (data || []).map(proforma => ({
+        ...proforma,
+        discount_amount: proforma.discount_amount || 0,
+        tax_amount: proforma.tax_amount || 0,
+        total_amount: proforma.total_amount || proforma.amount || 0
+      }));
+      
+      setProformas(processedData);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -367,6 +376,23 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     };
   };
 
+  // Helper function to calculate totals from a proforma object
+  const calculateProformaTotal = (proforma: any) => {
+    const subtotal = proforma.amount || 0;
+    const discountAmount = proforma.discount_amount || 0;
+    const taxAmount = proforma.tax_amount || 0;
+    const total = proforma.total_amount || subtotal;
+    
+    return {
+      subtotal,
+      discountAmount,
+      taxAmount,
+      total,
+      discountRate: proforma.discount_rate || 0,
+      taxRate: proforma.tax_rate || 0
+    };
+  };
+
   const fetchExportCharge = async () => {
     try {
       const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
@@ -570,22 +596,22 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <td colspan="3" align="right">SUBTOTAL:</td>
               <td align="right">${proforma.amount.toLocaleString()} ${proforma.currency}</td>
             </tr>
-            ${proforma.discount_rate ? `
+            ${proforma.discount_rate && proforma.discount_rate > 0 ? `
             <tr>
               <td colspan="3" align="right">Discount (${proforma.discount_rate}%):</td>
-              <td align="right" style="color: #FF9800;">-${proforma.discount_amount?.toLocaleString() || '0'} ${proforma.currency}</td>
+              <td align="right" style="color: #FF9800;">-${(proforma.discount_amount || 0).toLocaleString()} ${proforma.currency}</td>
             </tr>
             ` : ''}
-            ${proforma.tax_rate ? `
+            ${proforma.tax_rate && proforma.tax_rate > 0 ? `
             <tr>
               <td colspan="3" align="right">Tax (${proforma.tax_rate}%):</td>
-              <td align="right" style="color: #2196F3;">+${proforma.tax_amount?.toLocaleString() || '0'} ${proforma.currency}</td>
+              <td align="right" style="color: #2196F3;">+${(proforma.tax_amount || 0).toLocaleString()} ${proforma.currency}</td>
             </tr>
             ` : ''}
-            ${(proforma.tax_rate || proforma.discount_rate) ? `
+            ${(proforma.tax_rate && proforma.tax_rate > 0) || (proforma.discount_rate && proforma.discount_rate > 0) ? `
             <tr class="total" style="background: #E8F5E9; font-size: 14px;">
               <td colspan="3" align="right">FINAL TOTAL:</td>
-              <td align="right" style="color: #4CAF50; font-weight: bold;">${proforma.total_amount?.toLocaleString() || proforma.amount.toLocaleString()} ${proforma.currency}</td>
+              <td align="right" style="color: #4CAF50; font-weight: bold;">${(proforma.total_amount || proforma.amount).toLocaleString()} ${proforma.currency}</td>
             </tr>
             ` : ''}
           </table>
@@ -959,16 +985,16 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         <div className="mt-2 text-xs bg-gradient-to-r from-green-50 to-emerald-50 p-2 rounded border border-green-200">
                           {proforma.discount_rate ? (
                             <div className="text-orange-600">
-                              Discount: -{proforma.discount_amount?.toLocaleString() || '0'}
+                              Discount ({proforma.discount_rate}%): -{(proforma.discount_amount || 0).toLocaleString()}
                             </div>
                           ) : null}
                           {proforma.tax_rate ? (
                             <div className="text-blue-600">
-                              Tax: +{proforma.tax_amount?.toLocaleString() || '0'}
+                              Tax ({proforma.tax_rate}%): +{(proforma.tax_amount || 0).toLocaleString()}
                             </div>
                           ) : null}
                           <div className="font-bold text-green-600 mt-1">
-                            Total: {proforma.total_amount?.toLocaleString() || proforma.amount.toLocaleString()}
+                            Total: {(proforma.total_amount || proforma.amount).toLocaleString()} {proforma.currency}
                           </div>
                         </div>
                       )}
@@ -1191,24 +1217,35 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
               {/* Tax and Discount Display */}
               <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 space-y-2">
-                {previewProforma.discount_rate ? (
-                  <div className="flex justify-between text-orange-600">
-                    <span>Discount ({previewProforma.discount_rate}%):</span>
-                    <span>-{previewProforma.discount_amount?.toLocaleString() || '0'} {previewProforma.currency}</span>
-                  </div>
-                ) : null}
-                {previewProforma.tax_rate ? (
-                  <div className="flex justify-between text-blue-600">
-                    <span>Tax ({previewProforma.tax_rate}%):</span>
-                    <span>+{previewProforma.tax_amount?.toLocaleString() || '0'} {previewProforma.currency}</span>
-                  </div>
-                ) : null}
-                {(previewProforma.tax_rate || previewProforma.discount_rate) && (
-                  <div className="border-t pt-2 flex justify-between text-lg font-bold text-green-600">
-                    <span>Final Total:</span>
-                    <span>{previewProforma.total_amount?.toLocaleString() || previewProforma.amount.toLocaleString()} {previewProforma.currency}</span>
-                  </div>
-                )}
+                {(() => {
+                  const totals = calculateProformaTotal(previewProforma);
+                  return (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span className="font-semibold">{totals.subtotal.toLocaleString()} {previewProforma.currency}</span>
+                      </div>
+                      {totals.discountRate > 0 && (
+                        <div className="flex justify-between text-orange-600">
+                          <span>Discount ({totals.discountRate}%):</span>
+                          <span className="font-semibold">-{totals.discountAmount.toLocaleString()} {previewProforma.currency}</span>
+                        </div>
+                      )}
+                      {totals.taxRate > 0 && (
+                        <div className="flex justify-between text-blue-600">
+                          <span>Tax ({totals.taxRate}%):</span>
+                          <span className="font-semibold">+{totals.taxAmount.toLocaleString()} {previewProforma.currency}</span>
+                        </div>
+                      )}
+                      {(totals.taxRate > 0 || totals.discountRate > 0) && (
+                        <div className="border-t pt-2 flex justify-between text-lg font-bold text-green-600">
+                          <span>Final Total:</span>
+                          <span>{totals.total.toLocaleString()} {previewProforma.currency}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <Button variant="outline" onClick={() => setShowPreview(false)} className="w-full mt-4">
@@ -1324,14 +1361,26 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               </div>
 
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded border border-green-200 space-y-2 mb-4">
-                <p className="text-xs text-muted-foreground">Subtotal: {editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toLocaleString()} {editProforma.currency}</p>
-                {editProforma.discount_rate ? (
-                  <p className="text-xs text-orange-600">Discount ({editProforma.discount_rate}%): -{editProforma.discount_amount?.toLocaleString() || '0'} {editProforma.currency}</p>
-                ) : null}
-                {editProforma.tax_rate ? (
-                  <p className="text-xs text-blue-600">Tax ({editProforma.tax_rate}%): +{editProforma.tax_amount?.toLocaleString() || '0'} {editProforma.currency}</p>
-                ) : null}
-                <p className="text-sm font-bold text-green-600 mt-2">Final Total: {editProforma.total_amount?.toLocaleString() || editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toLocaleString()} {editProforma.currency}</p>
+                {(() => {
+                  const subtotal = editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+                  const discountAmount = (subtotal * (editProforma.discount_rate || 0)) / 100;
+                  const discountedAmount = subtotal - discountAmount;
+                  const taxAmount = (discountedAmount * (editProforma.tax_rate || 0)) / 100;
+                  const total = discountedAmount + taxAmount;
+                  
+                  return (
+                    <>
+                      <p className="text-xs text-muted-foreground">Subtotal: {subtotal.toLocaleString()} {editProforma.currency}</p>
+                      {editProforma.discount_rate ? (
+                        <p className="text-xs text-orange-600">Discount ({editProforma.discount_rate}%): -{discountAmount.toLocaleString()} {editProforma.currency}</p>
+                      ) : null}
+                      {editProforma.tax_rate ? (
+                        <p className="text-xs text-blue-600">Tax ({editProforma.tax_rate}%): +{taxAmount.toLocaleString()} {editProforma.currency}</p>
+                      ) : null}
+                      <p className="text-sm font-bold text-green-600 mt-2">Final Total: {total.toLocaleString()} {editProforma.currency}</p>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="flex gap-2">
