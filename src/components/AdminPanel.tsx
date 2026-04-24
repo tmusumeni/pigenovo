@@ -210,9 +210,10 @@ export function AdminPanel() {
 
   const fetchAllProfiles = async () => {
     try {
+      // Explicitly select all fields including phone data
       const { data, error } = await supabase
         .from('profiles')
-        .select('*, wallets(balance)')
+        .select('id, email, full_name, phone_number, country, country_code, phone_flag, role, created_at, wallets(balance)')
         .order('full_name');
       
       if (error) {
@@ -220,7 +221,7 @@ export function AdminPanel() {
         // Fallback: Fetch profiles first, then wallets if join fails
         const { data: profilesOnly, error: pError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, email, full_name, phone_number, country, country_code, phone_flag, role, created_at')
           .order('full_name');
         
         if (pError) throw pError;
@@ -228,7 +229,7 @@ export function AdminPanel() {
         // Fetch all wallets to map them manually
         const { data: allWallets } = await supabase.from('wallets').select('user_id, balance');
         
-        const mappedProfiles = profilesOnly.map(p => ({
+        const mappedProfiles = (profilesOnly || []).map(p => ({
           ...p,
           wallets: allWallets ? allWallets.filter(w => w.user_id === p.id) : []
         }));
@@ -846,7 +847,10 @@ export function AdminPanel() {
     }
 
     try {
-      const { error } = await supabase
+      setLoading(true);
+      
+      // Update the profile with new phone data
+      const { error, data } = await supabase
         .from('profiles')
         .update({ 
           phone_number: newPhone,
@@ -854,13 +858,34 @@ export function AdminPanel() {
           country_code: newCountryCode,
           phone_flag: country.flag
         })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select();
       
       if (error) throw error;
-      toast.success(`Phone number updated to ${newPhone} (${country.flag} ${newCountryCode})`);
-      fetchAllProfiles();
+      
+      toast.success(`✅ Phone number updated to ${newPhone} (${country.flag} ${newCountryCode})`);
+      
+      // Manually update the profile in state first for immediate UI update
+      setAllProfiles(prevProfiles => 
+        prevProfiles.map(p => 
+          p.id === userId 
+            ? {
+                ...p,
+                phone_number: newPhone,
+                country: country.name,
+                country_code: newCountryCode,
+                phone_flag: country.flag
+              }
+            : p
+        )
+      );
+      
+      // Then fetch fresh data from server
+      setTimeout(() => fetchAllProfiles(), 500);
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Failed to update phone number');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1909,8 +1934,10 @@ export function AdminPanel() {
                               <div className="flex items-center gap-2">
                                 <span className="text-lg">{profile.phone_flag || '🌍'}</span>
                                 <div>
-                                  <div className="font-mono font-bold">{profile.phone_number}</div>
-                                  <div className="text-xs text-muted-foreground">{profile.country} ({profile.country_code})</div>
+                                  <div className="font-mono font-bold text-sm">{profile.phone_number}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {profile.country || 'N/A'} {profile.country_code ? `(${profile.country_code})` : ''}
+                                  </div>
                                 </div>
                               </div>
                             ) : (
@@ -1945,9 +1972,15 @@ export function AdminPanel() {
                                 variant="outline" 
                                 size="sm" 
                                 className="text-[10px]"
-                                onClick={() => handleEditPhoneNumber(profile.id, profile.phone_number, profile.country, profile.country_code)}
+                                onClick={() => handleEditPhoneNumber(
+                                  profile.id, 
+                                  profile.phone_number || '', 
+                                  profile.country || 'Rwanda', 
+                                  profile.country_code || 'RW'
+                                )}
+                                disabled={loading}
                               >
-                                Edit Phone
+                                {loading ? 'Updating...' : 'Edit Phone'}
                               </Button>
                             </div>
                           </td>
