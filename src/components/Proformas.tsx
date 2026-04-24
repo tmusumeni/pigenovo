@@ -48,6 +48,9 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [editProforma, setEditProforma] = useState<ProformaWithItems | null>(null);
   const [editLineItems, setEditLineItems] = useState<ProformaItem[]>([]);
   const [exportCharge, setExportCharge] = useState(1000);
+  const [showSaveAfterExport, setShowSaveAfterExport] = useState(false);
+  const [exportPendingProforma, setExportPendingProforma] = useState<ProformaWithItems | null>(null);
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'image'>('pdf');
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -73,6 +76,34 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     fetchExportCharge();
   }, []);
 
+  const generateNextProformaNumber = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return 'PRO-001';
+
+      // Get all proformas for this user
+      const { data } = await supabase
+        .from('proformas')
+        .select('number')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!data || data.length === 0) {
+        return 'PRO-001';
+      }
+
+      // Extract number from last proforma (e.g., PRO-001 -> 001)
+      const lastNumber = data[0].number;
+      const lastNumPart = parseInt(lastNumber.split('-')[1]) || 0;
+      const nextNum = lastNumPart + 1;
+      
+      return `PRO-${String(nextNum).padStart(3, '0')}`;
+    } catch (error) {
+      return 'PRO-001';
+    }
+  };
+
   const fetchProformas = async () => {
     try {
       setLoading(true);
@@ -97,8 +128,13 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const handleCreateProforma = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.number || !formData.client_name || lineItems.length === 0) {
-      toast.error(t('common.error'));
+    if (!formData.client_name || lineItems.length === 0) {
+      toast.error('Please fill in client name and add at least one line item');
+      return;
+    }
+
+    if (!formData.number) {
+      toast.error('Proforma number not generated. Please try again.');
       return;
     }
 
@@ -145,7 +181,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       if (itemsError) throw itemsError;
       
-      toast.success(`${t('proforma.new')} ${t('common.success')}`);
+      toast.success(`✅ ${proformaData.number} created successfully`);
       setFormData({
         number: '',
         client_name: '',
@@ -374,6 +410,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       if (!wallet || wallet.balance < exportCharge) {
         toast.error(`Insufficient wallet balance. Need ${exportCharge} RWF to export`);
+        setLoading(false);
         return;
       }
 
@@ -400,14 +437,31 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       if (transError) throw transError;
 
-      // Generate and download
-      generateProformaDocument(proforma, format);
-      toast.success(`Proforma exported as ${format.toUpperCase()}. Charge: ${exportCharge} RWF deducted`);
+      // Show save/preview modal after charging
+      setExportPendingProforma(proforma);
+      setExportFormat(format);
+      setShowSaveAfterExport(true);
+      toast.success(`✅ Charge of ${exportCharge} RWF deducted. Choose action below.`);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveAfterExport = (action: 'preview' | 'download') => {
+    if (!exportPendingProforma) return;
+    
+    if (action === 'preview') {
+      setPreviewProforma(exportPendingProforma);
+      setShowPreview(true);
+    } else {
+      generateProformaDocument(exportPendingProforma, exportFormat);
+      toast.success(`✅ Proforma exported as ${exportFormat.toUpperCase()}`);
+    }
+    
+    setShowSaveAfterExport(false);
+    setExportPendingProforma(null);
   };
 
   const generateProformaDocument = (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
@@ -520,7 +574,13 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">{t('proforma.title')}</h1>
-        <Button onClick={() => setShowNew(!showNew)} className="gap-2">
+        <Button onClick={async () => {
+          if (!showNew) {
+            const nextNum = await generateNextProformaNumber();
+            setFormData(prev => ({ ...prev, number: nextNum }));
+          }
+          setShowNew(!showNew);
+        }} className="gap-2">
           <Plus className="h-4 w-4" />
           {t('proforma.new')}
         </Button>
@@ -543,12 +603,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>{t('proforma.number')}</Label>
-                      <Input
-                        value={formData.number}
-                        onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                        placeholder="PRO-001"
-                        required
-                      />
+                      <div className="p-2 border rounded bg-muted text-sm font-mono font-bold text-primary">
+                        {formData.number || 'Generating...'}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">🔄 Auto-generated</p>
                     </div>
                     <div>
                       <Label>{t('invoices.client_name')}</Label>
@@ -1079,6 +1137,64 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   Cancel
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Save/Preview Modal After Export */}
+      {showSaveAfterExport && exportPendingProforma && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowSaveAfterExport(false)}
+        >
+          <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <CardHeader>
+              <CardTitle className="text-green-600">💰 Payment Processed</CardTitle>
+              <CardDescription>
+                ✅ {exportCharge} RWF charged from your wallet
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-green-50 border border-green-200 rounded text-sm">
+                <p className="font-semibold text-green-900 mb-2">What would you like to do now?</p>
+                <p className="text-green-800">Your proforma is ready to be previewed or saved as {exportFormat.toUpperCase()}</p>
+              </div>
+
+              <div className="bg-muted p-3 rounded text-sm">
+                <p className="font-mono font-bold">{exportPendingProforma.number}</p>
+                <p className="text-muted-foreground">{exportPendingProforma.client_name}</p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={() => handleSaveAfterExport('preview')}
+                  className="gap-2"
+                  size="lg"
+                >
+                  <Eye className="h-4 w-4" />
+                  Preview Now
+                </Button>
+                <Button 
+                  onClick={() => handleSaveAfterExport('download')}
+                  variant="outline"
+                  className="gap-2"
+                  size="lg"
+                >
+                  <Download className="h-4 w-4" />
+                  Save as {exportFormat.toUpperCase()}
+                </Button>
+              </div>
+
+              <Button 
+                variant="ghost" 
+                onClick={() => setShowSaveAfterExport(false)}
+                className="w-full"
+              >
+                Skip for Now
+              </Button>
             </CardContent>
           </Card>
         </motion.div>

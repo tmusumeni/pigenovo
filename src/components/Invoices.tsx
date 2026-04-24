@@ -62,6 +62,34 @@ export function Invoices() {
     fetchWalletBalance();
   }, []);
 
+  const generateNextInvoiceNumber = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return 'INV-001';
+
+      // Get all invoices for this user
+      const { data } = await supabase
+        .from('invoices')
+        .select('number')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!data || data.length === 0) {
+        return 'INV-001';
+      }
+
+      // Extract number from last invoice (e.g., INV-001 -> 001)
+      const lastNumber = data[0].number;
+      const lastNumPart = parseInt(lastNumber.split('-')[1]) || 0;
+      const nextNum = lastNumPart + 1;
+      
+      return `INV-${String(nextNum).padStart(3, '0')}`;
+    } catch (error) {
+      return 'INV-001';
+    }
+  };
+
   const fetchInvoices = async () => {
     try {
       setLoading(true);
@@ -252,7 +280,13 @@ export function Invoices() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">{t('invoices.title')}</h1>
-        <Button onClick={() => setShowNew(!showNew)} className="gap-2">
+        <Button onClick={async () => {
+          if (!showNew) {
+            const nextNum = await generateNextInvoiceNumber();
+            setFormData(prev => ({ ...prev, number: nextNum }));
+          }
+          setShowNew(!showNew);
+        }} className="gap-2">
           <Plus className="h-4 w-4" />
           {t('invoices.new')}
         </Button>
@@ -269,12 +303,10 @@ export function Invoices() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>{t('invoices.number')}</Label>
-                    <Input
-                      value={formData.number}
-                      onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                      placeholder="INV-001"
-                      required
-                    />
+                    <div className="p-2 border rounded bg-muted text-sm font-mono font-bold text-primary">
+                      {formData.number || 'Generating...'}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">🔄 Auto-generated</p>
                   </div>
                   <div>
                     <Label>{t('invoices.client_name')}</Label>
