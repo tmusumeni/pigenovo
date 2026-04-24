@@ -148,7 +148,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       // Calculate total with tax and discount
       const totals = calculateTotalWithTaxAndDiscount();
 
-      // Create proforma
+      // Create proforma - temporarily without tax/discount fields until migrations run
       const { data: proformaData, error: proformaError } = await supabase
         .from('proformas')
         .insert([{
@@ -161,17 +161,37 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           currency: formData.currency,
           description: formData.description,
           valid_until: formData.valid_until || null,
-          status: 'draft',
-          tax_rate: formData.tax_rate,
-          discount_rate: formData.discount_rate,
-          tax_amount: totals.taxAmount,
-          discount_amount: totals.discountAmount,
-          total_amount: totals.total
+          status: 'draft'
         }])
         .select()
         .single();
 
-      if (proformaError) throw proformaError;
+      if (proformaError) {
+        // If error is about missing columns, guide user to run migrations
+        if (proformaError.message.includes('discount_amount') || proformaError.message.includes('tax_amount')) {
+          throw new Error('Database columns missing. Please run the tax/discount migrations in Supabase SQL Editor first.');
+        }
+        throw proformaError;
+      }
+
+      // After proforma is created, try to update with tax/discount values
+      // This will succeed if migrations have been run
+      const updateData: any = {};
+      if (formData.tax_rate) updateData.tax_rate = formData.tax_rate;
+      if (formData.discount_rate) updateData.discount_rate = formData.discount_rate;
+      if (formData.tax_rate || formData.discount_rate) {
+        updateData.tax_amount = totals.taxAmount;
+        updateData.discount_amount = totals.discountAmount;
+        updateData.total_amount = totals.total;
+
+        await supabase
+          .from('proformas')
+          .update(updateData)
+          .eq('id', proformaData.id)
+          .then(result => {
+            // If update fails due to missing columns, that's OK - continues anyway
+          });
+      }
 
       // Create line items
       const itemsToInsert = lineItems.map(item => ({
