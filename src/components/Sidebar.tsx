@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { LanguageSelector } from '@/components/LanguageSelector';
 import { supabase } from '../supabaseClient';
 
 interface SidebarProps {
@@ -109,7 +110,10 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
         )}
       </nav>
 
-      <div className="p-4 border-t">
+      <div className="p-4 border-t space-y-2">
+        <div className="pb-2">
+          <LanguageSelector />
+        </div>
         <Button 
           variant="ghost" 
           className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"

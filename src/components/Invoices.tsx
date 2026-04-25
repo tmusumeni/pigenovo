@@ -46,6 +46,7 @@ export function Invoices() {
   const [loading, setLoading] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [walletBalance, setWalletBalance] = useState(0);
 
@@ -92,6 +93,124 @@ export function Invoices() {
       return `INV-${String(nextNum).padStart(3, '0')}`;
     } catch (error) {
       return 'INV-001';
+    }
+  };
+
+  const fetchInvoiceItems = async (invoiceId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('invoice_items')
+        .select('*')
+        .eq('invoice_id', invoiceId);
+
+      if (error) throw error;
+      setInvoiceItems(data || []);
+    } catch (error: any) {
+      console.error('Failed to fetch invoice items:', error.message);
+    }
+  };
+
+  const generateInvoiceDocument = (invoice: Invoice, items: InvoiceItem[], format: 'pdf' | 'image') => {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+          .title { font-size: 24px; font-weight: bold; }
+          .subtitle { font-size: 14px; color: #666; }
+          .section { margin-bottom: 20px; }
+          .label { font-weight: bold; margin-top: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { background: #f0f0f0; padding: 8px; text-align: left; border: 1px solid #ddd; }
+          td { padding: 8px; border: 1px solid #ddd; }
+          .total { font-weight: bold; background: #f9f9f9; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">INVOICE</div>
+          <div class="subtitle">Invoice #: ${invoice.number}</div>
+        </div>
+        
+        <div class="section">
+          <div class="label">Bill To:</div>
+          <p>Name: ${invoice.client_name}</p>
+          ${invoice.client_phone ? `<p>Phone: ${invoice.client_phone}</p>` : ''}
+          ${invoice.client_email ? `<p>Email: ${invoice.client_email}</p>` : ''}
+        </div>
+        
+        <div class="section">
+          <div class="label">Invoice Details:</div>
+          <p>Date: ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
+          ${invoice.due_date ? `<p>Due Date: ${new Date(invoice.due_date).toLocaleDateString()}</p>` : ''}
+          <p>Status: ${invoice.status.toUpperCase()}</p>
+          ${invoice.description ? `<p>Description: ${invoice.description}</p>` : ''}
+        </div>
+        
+        <div class="section">
+          <div class="label">Line Items:</div>
+          <table>
+            <tr>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+            </tr>
+            ${items.map(item => `
+              <tr>
+                <td>${item.description}</td>
+                <td align="right">${item.quantity}</td>
+                <td align="right">${item.unit_price.toLocaleString()}</td>
+                <td align="right">${item.amount.toLocaleString()}</td>
+              </tr>
+            `).join('')}
+            <tr class="total">
+              <td colspan="3" align="right">SUBTOTAL:</td>
+              <td align="right">${invoice.amount.toLocaleString()} ${invoice.currency}</td>
+            </tr>
+            <tr>
+              <td colspan="3" align="right">Discount ${invoice.discount_rate && invoice.discount_rate > 0 ? `(${invoice.discount_rate}%)` : '(0%)'}:</td>
+              <td align="right" style="color: #FF9800;">-${(invoice.discount_amount || 0).toLocaleString()} ${invoice.currency}</td>
+            </tr>
+            <tr>
+              <td colspan="3" align="right">Tax ${invoice.tax_rate && invoice.tax_rate > 0 ? `(${invoice.tax_rate}%)` : '(0%)'}:</td>
+              <td align="right" style="color: #2196F3;">+${(invoice.tax_amount || 0).toLocaleString()} ${invoice.currency}</td>
+            </tr>
+            <tr class="total" style="background: #E8F5E9; font-size: 14px;">
+              <td colspan="3" align="right">FINAL TOTAL:</td>
+              <td align="right" style="color: #4CAF50; font-weight: bold;">${(invoice.total_amount || invoice.amount).toLocaleString()} ${invoice.currency}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="footer">
+          <p>This is an automatically generated invoice.</p>
+          <p>Generated on: ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Invoice-${invoice.number}.html`;
+    link.click();
+  };
+
+  const handleExportInvoice = async (invoice: Invoice, format: 'pdf' | 'image') => {
+    try {
+      await fetchInvoiceItems(invoice.id);
+      // Use invoice items from state after fetch
+      setTimeout(() => {
+        generateInvoiceDocument(invoice, invoiceItems, format);
+      }, 100);
+    } catch (error: any) {
+      toast.error(error.message);
     }
   };
 
@@ -442,8 +561,27 @@ export function Invoices() {
                         {t('invoices.pay_from_wallet')}
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => setSelectedInvoice(invoice)}>
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      setSelectedInvoice(invoice);
+                      fetchInvoiceItems(invoice.id);
+                    }} title="Preview Invoice">
                       <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleExportInvoice(invoice, 'pdf')}
+                      title="Download as PDF"
+                    >
+                      <Download className="h-4 w-4 text-blue-500" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleExportInvoice(invoice, 'image')}
+                      title="Download as Image"
+                    >
+                      <Printer className="h-4 w-4 text-green-500" />
                     </Button>
                     <Button
                       size="sm"
@@ -460,6 +598,113 @@ export function Invoices() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Invoice Preview Modal */}
+      {selectedInvoice && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedInvoice(null)}
+        >
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Invoice: {selectedInvoice.number}</CardTitle>
+                <CardDescription>{selectedInvoice.client_name}</CardDescription>
+              </div>
+              <Button variant="ghost" onClick={() => setSelectedInvoice(null)}>✕</Button>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Bill To</p>
+                  <p className="font-bold">{selectedInvoice.client_name}</p>
+                  {selectedInvoice.client_phone && <p className="text-sm">{selectedInvoice.client_phone}</p>}
+                  {selectedInvoice.client_email && <p className="text-sm">{selectedInvoice.client_email}</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Invoice #</p>
+                  <p className="font-mono font-bold">{selectedInvoice.number}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Status</p>
+                  <p className="text-xs px-2 py-1 rounded-full font-semibold w-fit bg-blue-100 text-blue-700">
+                    {selectedInvoice.status.toUpperCase()}
+                  </p>
+                </div>
+              </div>
+
+              {invoiceItems.length > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Line Items</p>
+                  <table className="w-full text-sm border rounded">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="p-2 text-left">Description</th>
+                        <th className="p-2 text-right">Qty</th>
+                        <th className="p-2 text-right">Unit Price</th>
+                        <th className="p-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoiceItems.map((item, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="p-2">{item.description}</td>
+                          <td className="p-2 text-right">{item.quantity}</td>
+                          <td className="p-2 text-right">{item.unit_price.toLocaleString()}</td>
+                          <td className="p-2 text-right font-bold">{item.amount.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Tax and Discount Display */}
+              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span className="font-semibold">{selectedInvoice.amount.toLocaleString()} {selectedInvoice.currency}</span>
+                </div>
+                <div className="flex justify-between text-orange-600">
+                  <span>Discount {selectedInvoice.discount_rate && selectedInvoice.discount_rate > 0 ? `(${selectedInvoice.discount_rate}%)` : '(0%)'}:</span>
+                  <span className="font-semibold">-{(selectedInvoice.discount_amount || 0).toLocaleString()} {selectedInvoice.currency}</span>
+                </div>
+                <div className="flex justify-between text-blue-600">
+                  <span>Tax {selectedInvoice.tax_rate && selectedInvoice.tax_rate > 0 ? `(${selectedInvoice.tax_rate}%)` : '(0%)'}:</span>
+                  <span className="font-semibold">+{(selectedInvoice.tax_amount || 0).toLocaleString()} {selectedInvoice.currency}</span>
+                </div>
+                <div className="border-t pt-2 flex justify-between text-lg font-bold text-green-600">
+                  <span>Final Total:</span>
+                  <span>{(selectedInvoice.total_amount || selectedInvoice.amount).toLocaleString()} {selectedInvoice.currency}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => handleExportInvoice(selectedInvoice, 'pdf')}
+                  className="flex-1 gap-2"
+                  variant="outline"
+                >
+                  <Download className="h-4 w-4" />
+                  Download as PDF
+                </Button>
+                <Button 
+                  onClick={() => handleExportInvoice(selectedInvoice, 'image')}
+                  className="flex-1 gap-2"
+                  variant="outline"
+                >
+                  <Printer className="h-4 w-4" />
+                  Download as Image
+                </Button>
+              </div>
+
+              <Button variant="outline" onClick={() => setSelectedInvoice(null)} className="w-full">
+                Close
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,8 @@ interface ReportData {
   total_paid: number;
   total_pending: number;
   total_overdue: number;
+  total_tax?: number;
+  total_discount?: number;
   invoice_count: number;
   paid_count: number;
   pending_count: number;
@@ -109,12 +111,14 @@ export function Reports() {
 
       if (invoiceError) throw invoiceError;
 
-      // Calculate statistics
+      // Calculate statistics - use total_amount (includes tax/discount) for totals
       const stats = {
-        total_invoiced: invoices?.reduce((sum, inv) => sum + Number(inv.amount), 0) || 0,
-        total_paid: invoices?.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + Number(inv.amount), 0) || 0,
-        total_pending: invoices?.filter(inv => inv.status === 'sent').reduce((sum, inv) => sum + Number(inv.amount), 0) || 0,
-        total_overdue: invoices?.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + Number(inv.amount), 0) || 0,
+        total_invoiced: invoices?.reduce((sum, inv) => sum + Number(inv.total_amount || inv.amount), 0) || 0,
+        total_paid: invoices?.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + Number(inv.total_amount || inv.amount), 0) || 0,
+        total_pending: invoices?.filter(inv => inv.status === 'sent').reduce((sum, inv) => sum + Number(inv.total_amount || inv.amount), 0) || 0,
+        total_overdue: invoices?.filter(inv => inv.status === 'overdue').reduce((sum, inv) => sum + Number(inv.total_amount || inv.amount), 0) || 0,
+        total_tax: invoices?.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0) || 0,
+        total_discount: invoices?.reduce((sum, inv) => sum + Number(inv.discount_amount || 0), 0) || 0,
         invoice_count: invoices?.length || 0,
         paid_count: invoices?.filter(inv => inv.status === 'paid').length || 0,
         pending_count: invoices?.filter(inv => inv.status === 'sent').length || 0,
@@ -158,7 +162,7 @@ export function Reports() {
     if (!currentReport) return;
 
     try {
-      const csv = `Report Type,${currentReport.report_type}\nPeriod,"${currentReport.start_date} to ${currentReport.end_date}"\n\nMetrics,Amount/Count\nTotal Invoiced,${currentReport.total_invoiced}\nTotal Paid,${currentReport.total_paid}\nTotal Pending,${currentReport.total_pending}\nTotal Overdue,${currentReport.total_overdue}\nInvoice Count,${currentReport.invoice_count}\nPaid Count,${currentReport.paid_count}\nPending Count,${currentReport.pending_count}\nOverdue Count,${currentReport.overdue_count}`;
+      const csv = `Report Type,${currentReport.report_type}\nPeriod,"${currentReport.start_date} to ${currentReport.end_date}"\n\nMetrics,Amount/Count\nTotal Invoiced,${currentReport.total_invoiced}\nTotal Paid,${currentReport.total_paid}\nTotal Pending,${currentReport.total_pending}\nTotal Overdue,${currentReport.total_overdue}\nTotal Discount,${currentReport.total_discount || 0}\nTotal Tax,${currentReport.total_tax || 0}\n\nCounts,Amount\nInvoice Count,${currentReport.invoice_count}\nPaid Count,${currentReport.paid_count}\nPending Count,${currentReport.pending_count}\nOverdue Count,${currentReport.overdue_count}`;
 
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
@@ -271,6 +275,30 @@ export function Reports() {
                   <p className="text-sm text-muted-foreground">{t('reports.total_overdue')}</p>
                   <p className="text-2xl font-bold text-red-500 mt-2">
                     {currentReport.total_overdue.toLocaleString()}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tax and Discount Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <Card className="bg-orange-50 border-orange-200">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <p className="text-sm text-orange-600 font-semibold">Total Discount</p>
+                  <p className="text-2xl font-bold text-orange-600 mt-2">
+                    -{(currentReport.total_discount || 0).toLocaleString()} RWF
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <p className="text-sm text-blue-600 font-semibold">Total Tax</p>
+                  <p className="text-2xl font-bold text-blue-600 mt-2">
+                    +{(currentReport.total_tax || 0).toLocaleString()} RWF
                   </p>
                 </div>
               </CardContent>

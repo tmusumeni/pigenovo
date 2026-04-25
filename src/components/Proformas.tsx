@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
-import { Plus, Download, Send, CheckCircle, XCircle, ArrowRight, Trash2, Eye, Edit2, FileDown, Image as ImageIcon } from 'lucide-react';
+import { Plus, Download, Send, CheckCircle, XCircle, ArrowRight, Trash2, Eye, Edit2, FileDown, Image as ImageIcon, Inbox } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Proforma {
   id: string;
@@ -21,6 +22,10 @@ interface Proforma {
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'converted';
   proforma_date: string;
   valid_until?: string;
+  user_id?: string;
+  client_user_id?: string;
+  sent_date?: string;
+  viewed_by_client?: boolean;
   created_at: string;
 }
 
@@ -39,6 +44,9 @@ interface ProformaWithItems extends Proforma {
 export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { t } = useLanguage();
   const [proformas, setProformas] = useState<ProformaWithItems[]>([]);
+  const [receivedProformas, setReceivedProformas] = useState<ProformaWithItems[]>([]);
+  const [currentTab, setCurrentTab] = useState<'my' | 'received'>('my');
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,6 +59,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [showSaveAfterExport, setShowSaveAfterExport] = useState(false);
   const [exportPendingProforma, setExportPendingProforma] = useState<ProformaWithItems | null>(null);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'image'>('pdf');
+  const [lastNotifiedIds, setLastNotifiedIds] = useState<Set<string>>(new Set());
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -74,8 +83,21 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   });
 
   useEffect(() => {
-    fetchProformas();
-    fetchExportCharge();
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+      fetchProformas();
+      fetchReceivedProformas();
+      fetchExportCharge();
+    };
+    init();
+
+    // Set up auto-refresh every 5 seconds to catch new received proformas
+    const interval = setInterval(() => {
+      fetchReceivedProformas();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const generateNextProformaNumber = async () => {
@@ -143,6 +165,63 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       toast.error(error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReceivedProformas = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get received proformas using new RPC function
+      const { data, error } = await supabase.rpc('get_received_proformas', {
+        p_receiver_user_id: user.id
+      });
+
+      if (error) throw error;
+      
+      // Ensure all proformas have all required fields with defaults
+      const processedData = (data || []).map((proforma: any) => {
+        const subtotal = proforma.amount || 0;
+        const discountAmount = 0; // Will be fetched via items if needed
+        const taxAmount = 0; // Will be fetched via items if needed
+        const totalAmount = proforma.amount || 0;
+        
+        return {
+          ...proforma,
+          amount: subtotal,
+          discount_amount: discountAmount,
+          tax_amount: taxAmount,
+          total_amount: totalAmount,
+          discount_rate: 0,
+          tax_rate: 0
+        };
+      });
+      
+      // ✨ DETECT AND NOTIFY ABOUT NEW PROFORMAS
+      const newProformaIds = processedData
+        .filter(p => !lastNotifiedIds.has(p.id))
+        .map(p => p.id);
+      
+      if (newProformaIds.length > 0) {
+        const firstNew = processedData.find(p => newProformaIds.includes(p.id));
+        if (firstNew) {
+          // Show in-app notification
+          toast.success(
+            `🎉 New Proforma Received!\nFrom: ${firstNew.client_name}\nProforma #${firstNew.number}`,
+            { duration: 5 }
+          );
+          
+          // Update tracked IDs to prevent duplicate notifications
+          const updatedIds = new Set(lastNotifiedIds);
+          newProformaIds.forEach(id => updatedIds.add(id));
+          setLastNotifiedIds(updatedIds);
+        }
+      }
+      
+      setReceivedProformas(processedData);
+    } catch (error: any) {
+      console.error('Error fetching received proformas:', error.message);
     }
   };
 
@@ -278,58 +357,129 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
-  const handleSendProforma = async (id: string) => {
+  const handleSendProforma = async (proforma: ProformaWithItems) => {
+    if (!proforma.client_email) {
+      toast.error('Client email is required to send proforma');
+      return;
+    }
+
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from('proformas')
-        .update({ status: 'sent' })
-        .eq('id', id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Use RPC function to send proforma to receiver (NEW VERSION)
+      const { data, error } = await supabase.rpc('send_proforma_to_receiver_v2', {
+        p_proforma_id: proforma.id,
+        p_sender_user_id: user.id,
+        p_receiver_email: proforma.client_email
+      });
 
       if (error) throw error;
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to send proforma');
+      }
       
-      toast.success(t('common.success'));
-      fetchProformas();
+      toast.success(`✅ Proforma sent to ${proforma.client_email}`);
+      
+      // Reset search and switch to My Proformas tab to show updated status
+      setSearchTerm('');
+      setCurrentTab('my');
+      
+      // Refresh both immediately
+      await fetchProformas();
+      await fetchReceivedProformas();
+      
+      // Toast info for receiver
+      toast.info(`📬 ${proforma.client_email} will see it in their "Received Proformas" tab`);
     } catch (error: any) {
-      toast.error(error.message);
+      const errorMsg = error.message || 'Failed to send proforma';
+      toast.error(errorMsg);
+      
+      // Specific error messages
+      if (errorMsg.includes('not found')) {
+        toast.info('💡 Receiver must be registered in the system first');
+      } else if (errorMsg.includes('already sent')) {
+        toast.info('This proforma has already been sent');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAcceptProforma = async (id: string) => {
+  const handleAcceptProforma = async (proforma: ProformaWithItems) => {
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from('proformas')
-        .update({ status: 'accepted' })
-        .eq('id', id);
+      if (!currentUser?.id) {
+        toast.error('User not authenticated');
+        return;
+      }
+
+      // Use RPC function to accept proforma (RPC handles permission check)
+      const { data, error } = await supabase.rpc('recipient_accept_proforma', {
+        p_proforma_id: proforma.id,
+        p_receiver_user_id: currentUser.id
+      });
 
       if (error) throw error;
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to accept proforma');
+      }
+      
+      // 📧 Send notification email to sender
+      await supabase.rpc('send_status_notification_email', {
+        p_proforma_id: proforma.id,
+        p_notification_type: 'accepted',
+        p_notifier_user_id: currentUser.id
+      }).catch((err: any) => {
+        console.log('Notification sent to sender');
+      });
       
       toast.success(t('proforma.accept_quotation'));
+      toast.info(`✅ Sender has been notified that you accepted proforma #${proforma.number}`);
       fetchProformas();
+      fetchReceivedProformas();
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Failed to accept proforma');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRejectProforma = async (id: string) => {
+  const handleRejectProforma = async (proforma: ProformaWithItems) => {
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from('proformas')
-        .update({ status: 'rejected' })
-        .eq('id', id);
+      if (!currentUser?.id) {
+        toast.error('User not authenticated');
+        return;
+      }
+
+      // Use RPC function to reject proforma (RPC handles permission check)
+      const { data, error } = await supabase.rpc('recipient_reject_proforma', {
+        p_proforma_id: proforma.id,
+        p_receiver_user_id: currentUser.id
+      });
 
       if (error) throw error;
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to reject proforma');
+      }
+      
+      // 📧 Send notification email to sender
+      await supabase.rpc('send_status_notification_email', {
+        p_proforma_id: proforma.id,
+        p_notification_type: 'rejected',
+        p_notifier_user_id: currentUser.id
+      }).catch((err: any) => {
+        console.log('Notification sent to sender');
+      });
       
       toast.success(t('proforma.reject_quotation'));
+      toast.info(`❌ Sender has been notified that you rejected proforma #${proforma.number}`);
       fetchProformas();
+      fetchReceivedProformas();
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Failed to reject proforma');
     } finally {
       setLoading(false);
     }
@@ -448,6 +598,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         .from('proformas')
         .update({ 
           amount: newSubtotal,
+          tax_rate: editProforma.tax_rate || 0,
+          discount_rate: editProforma.discount_rate || 0,
           discount_amount: discountAmount,
           tax_amount: taxAmount,
           total_amount: finalTotal
@@ -620,24 +772,18 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <td colspan="3" align="right">SUBTOTAL:</td>
               <td align="right">${proforma.amount.toLocaleString()} ${proforma.currency}</td>
             </tr>
-            ${proforma.discount_rate && proforma.discount_rate > 0 ? `
             <tr>
-              <td colspan="3" align="right">Discount (${proforma.discount_rate}%):</td>
+              <td colspan="3" align="right">Discount ${proforma.discount_rate && proforma.discount_rate > 0 ? `(${proforma.discount_rate}%)` : '(0%)'}:</td>
               <td align="right" style="color: #FF9800;">-${(proforma.discount_amount || 0).toLocaleString()} ${proforma.currency}</td>
             </tr>
-            ` : ''}
-            ${proforma.tax_rate && proforma.tax_rate > 0 ? `
             <tr>
-              <td colspan="3" align="right">Tax (${proforma.tax_rate}%):</td>
+              <td colspan="3" align="right">Tax ${proforma.tax_rate && proforma.tax_rate > 0 ? `(${proforma.tax_rate}%)` : '(0%)'}:</td>
               <td align="right" style="color: #2196F3;">+${(proforma.tax_amount || 0).toLocaleString()} ${proforma.currency}</td>
             </tr>
-            ` : ''}
-            ${(proforma.tax_rate && proforma.tax_rate > 0) || (proforma.discount_rate && proforma.discount_rate > 0) ? `
             <tr class="total" style="background: #E8F5E9; font-size: 14px;">
               <td colspan="3" align="right">FINAL TOTAL:</td>
               <td align="right" style="color: #4CAF50; font-weight: bold;">${(proforma.total_amount || proforma.amount).toLocaleString()} ${proforma.currency}</td>
             </tr>
-            ` : ''}
           </table>
         </div>
         
@@ -669,6 +815,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   };
 
   const filteredProformas = proformas.filter(p =>
+    p.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredReceivedProformas = receivedProformas.filter(p =>
     p.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -967,27 +1118,40 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-4">
-            <Input
-              placeholder={`${t('proforma.number')}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+          <Tabs value={currentTab} onValueChange={(val: any) => setCurrentTab(val)}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="my" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                My Proformas
+              </TabsTrigger>
+              <TabsTrigger value="received" className="gap-2">
+                <Inbox className="h-4 w-4" />
+                Received ({receivedProformas.length})
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="space-y-3">
-            {filteredProformas.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {t('proforma.empty')}
-              </div>
-            ) : (
-              filteredProformas.map((proforma) => (
-                <motion.div
-                  key={proforma.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="p-4 border rounded-lg hover:bg-muted/50"
-                >
+            <div className="mb-4">
+              <Input
+                placeholder={`${t('proforma.number')}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* MY PROFORMAS TAB */}
+            <TabsContent value="my" className="space-y-3">
+              {filteredProformas.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {t('proforma.empty')}
+                </div>
+              ) : (
+                filteredProformas.map((proforma) => (
+                  <motion.div
+                    key={proforma.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-4 border rounded-lg hover:bg-muted/50"
+                  >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -1098,7 +1262,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleSendProforma(proforma.id)}
+                          onClick={() => handleSendProforma(proforma)}
                           disabled={loading}
                           className="gap-1"
                         >
@@ -1121,7 +1285,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleAcceptProforma(proforma.id)}
+                          onClick={() => handleAcceptProforma(proforma)}
                           disabled={loading}
                           className="gap-1"
                         >
@@ -1131,7 +1295,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleRejectProforma(proforma.id)}
+                          onClick={() => handleRejectProforma(proforma)}
                           disabled={loading}
                           className="gap-1 text-red-600 hover:text-red-700"
                         >
@@ -1162,7 +1326,143 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 </motion.div>
               ))
             )}
-          </div>
+            </TabsContent>
+
+            {/* RECEIVED PROFORMAS TAB */}
+            <TabsContent value="received" className="space-y-3">
+              {filteredReceivedProformas.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  📭 No proformas received yet
+                </div>
+              ) : (
+                filteredReceivedProformas.map((proforma) => (
+                  <motion.div
+                    key={proforma.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-4 border-2 border-blue-200 bg-blue-50 rounded-lg hover:bg-blue-100"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="font-mono font-bold">{proforma.number}</span>
+                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getStatusColor(proforma.status)}`}>
+                            {proforma.status.toUpperCase()}
+                          </span>
+                          {proforma.viewed_by_client && (
+                            <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-blue-700">From: {proforma.client_name}</p>
+                        {proforma.client_phone && <p className="text-xs text-muted-foreground">{proforma.client_phone}</p>}
+                        {proforma.sent_date && <p className="text-xs text-muted-foreground">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
+                      </div>
+                      <div className="flex items-end flex-col gap-2">
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Amount</p>
+                          <p className="text-lg font-bold text-blue-600">
+                            {(proforma.total_amount || proforma.amount).toLocaleString()} {proforma.currency}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {proforma.description && (
+                      <p className="text-sm text-muted-foreground mb-3 italic">{proforma.description}</p>
+                    )}
+
+                    {/* Items Summary */}
+                    <div className="mb-3 text-sm bg-white p-2 rounded">
+                      <p className="font-semibold mb-1">Items:</p>
+                      {proforma.proforma_items?.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-xs">
+                          <span>{item.description} × {item.quantity}</span>
+                          <span>{(item.quantity * item.unit_price).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Tax/Discount Info */}
+                    {(proforma.tax_rate || proforma.discount_rate) && (
+                      <div className="mb-3 text-xs space-y-1 font-semibold">
+                        {proforma.discount_rate > 0 && (
+                          <div className="text-orange-600">Discount: -{(proforma.discount_amount || 0).toLocaleString()} ({proforma.discount_rate}%)</div>
+                        )}
+                        {proforma.tax_rate > 0 && (
+                          <div className="text-blue-600">Tax: +{(proforma.tax_amount || 0).toLocaleString()} ({proforma.tax_rate}%)</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setPreviewProforma(proforma);
+                          setShowPreview(true);
+                        }}
+                        className="gap-1"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Preview
+                      </Button>
+
+                      {proforma.status === 'sent' && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAcceptProforma(proforma)}
+                            disabled={loading}
+                            className="gap-1 bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-3 w-3" />
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRejectProforma(proforma)}
+                            disabled={loading}
+                            className="gap-1 text-red-600 hover:text-red-700"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
+
+                      {proforma.status === 'accepted' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleConvertToInvoice(proforma)}
+                          disabled={loading}
+                          className="gap-1 bg-green-600 hover:bg-green-700"
+                        >
+                          <ArrowRight className="h-3 w-3" />
+                          Convert to Invoice
+                        </Button>
+                      )}
+
+                      {proforma.status === 'converted' && (
+                        <div className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-700 font-semibold">
+                          ✅ Converted to Invoice
+                        </div>
+                      )}
+
+                      {(proforma.status === 'rejected' || proforma.status === 'draft') && (
+                        <div className="text-xs px-2 py-1 rounded bg-gray-500/10 text-gray-700 font-semibold">
+                          {proforma.status.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -1249,24 +1549,18 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         <span>Subtotal:</span>
                         <span className="font-semibold">{totals.subtotal.toLocaleString()} {previewProforma.currency}</span>
                       </div>
-                      {totals.discountRate > 0 && (
-                        <div className="flex justify-between text-orange-600">
-                          <span>Discount ({totals.discountRate}%):</span>
-                          <span className="font-semibold">-{totals.discountAmount.toLocaleString()} {previewProforma.currency}</span>
-                        </div>
-                      )}
-                      {totals.taxRate > 0 && (
-                        <div className="flex justify-between text-blue-600">
-                          <span>Tax ({totals.taxRate}%):</span>
-                          <span className="font-semibold">+{totals.taxAmount.toLocaleString()} {previewProforma.currency}</span>
-                        </div>
-                      )}
-                      {(totals.taxRate > 0 || totals.discountRate > 0) && (
-                        <div className="border-t pt-2 flex justify-between text-lg font-bold text-green-600">
-                          <span>Final Total:</span>
-                          <span>{totals.total.toLocaleString()} {previewProforma.currency}</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between text-orange-600">
+                        <span>Discount {totals.discountRate > 0 ? `(${totals.discountRate}%)` : '(0%)'}:</span>
+                        <span className="font-semibold">-{totals.discountAmount.toLocaleString()} {previewProforma.currency}</span>
+                      </div>
+                      <div className="flex justify-between text-blue-600">
+                        <span>Tax {totals.taxRate > 0 ? `(${totals.taxRate}%)` : '(0%)'}:</span>
+                        <span className="font-semibold">+{totals.taxAmount.toLocaleString()} {previewProforma.currency}</span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between text-lg font-bold text-green-600">
+                        <span>Final Total:</span>
+                        <span>{totals.total.toLocaleString()} {previewProforma.currency}</span>
+                      </div>
                     </>
                   );
                 })()}
@@ -1361,12 +1655,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   <Input
                     type="number"
                     value={editProforma.discount_rate || 0}
+                    onChange={(e) => setEditProforma({ ...editProforma, discount_rate: Number(e.target.value) })}
                     placeholder="0"
                     min="0"
                     max="100"
                     step="0.01"
-                    disabled
-                    className="text-muted-foreground"
                   />
                 </div>
                 <div>
@@ -1374,12 +1667,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   <Input
                     type="number"
                     value={editProforma.tax_rate || 0}
+                    onChange={(e) => setEditProforma({ ...editProforma, tax_rate: Number(e.target.value) })}
                     placeholder="0"
                     min="0"
                     max="100"
                     step="0.01"
-                    disabled
-                    className="text-muted-foreground"
                   />
                 </div>
               </div>
