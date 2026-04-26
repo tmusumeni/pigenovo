@@ -605,23 +605,35 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         return;
       }
       
-      // VALIDATION: Check for duplicate items
-      const seen = new Set<string>();
-      const hasDuplicates = editLineItems.some(item => {
+      // AUTO-CLEAN: Remove duplicate items automatically
+      const seen = new Set<ProformaItem>();
+      const uniqueItems: ProformaItem[] = [];
+      let duplicatesRemoved = 0;
+      
+      editLineItems.forEach(item => {
         const key = `${item.description}|${item.quantity}|${item.unit_price}`;
-        if (seen.has(key)) return true;
-        seen.add(key);
-        return false;
+        const isDuplicate = uniqueItems.some(u => 
+          u.description === item.description && 
+          u.quantity === item.quantity && 
+          u.unit_price === item.unit_price
+        );
+        
+        if (!isDuplicate) {
+          uniqueItems.push(item);
+        } else {
+          duplicatesRemoved++;
+        }
       });
       
-      if (hasDuplicates) {
-        toast.error('⚠️ Duplicate items detected! Click "Remove Duplicates" first.');
-        setLoading(false);
-        return;
+      // Update line items with cleaned version
+      setEditLineItems(uniqueItems);
+      
+      if (duplicatesRemoved > 0) {
+        toast.info(`🧹 Auto-cleaned: Removed ${duplicatesRemoved} duplicate item(s)`);
       }
       
-      // Calculate new total from edited items
-      const newSubtotal = editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      // Calculate new total from cleaned items
+      const newSubtotal = uniqueItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
       
       // Recalculate tax and discount based on new subtotal
       const discountAmount = (newSubtotal * (editProforma.discount_rate || 0)) / 100;
@@ -646,7 +658,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           proforma_date: editProforma.proforma_date,
           valid_until: editProforma.valid_until,
           
-          // Amounts
+          // Amounts (calculated from cleaned items)
           amount: newSubtotal,
           tax_rate: editProforma.tax_rate || 0,
           discount_rate: editProforma.discount_rate || 0,
@@ -657,15 +669,14 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           // Status
           status: editProforma.status === 'sent' ? 'draft' : editProforma.status,
           
-          // Always track that this was updated
+          // Track update timestamp
           updated_at: new Date().toISOString()
         })
         .eq('id', editProforma.id);
       
       if (updateError) throw updateError;
       
-      // Smart item update: Delete old items and insert new ones
-      // (preserves proforma integrity)
+      // Delete old items from database
       if (editProforma.proforma_items && editProforma.proforma_items.length > 0) {
         const { error: deleteError } = await supabase
           .from('proforma_items')
@@ -674,9 +685,9 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         if (deleteError) throw deleteError;
       }
       
-      // Only insert items if there are any (already validated above)
-      if (editLineItems.length > 0) {
-        const itemsToInsert = editLineItems.map(item => ({
+      // Insert cleaned items into database
+      if (uniqueItems.length > 0) {
+        const itemsToInsert = uniqueItems.map(item => ({
           proforma_id: editProforma.id,
           description: item.description,
           quantity: item.quantity,
@@ -691,12 +702,13 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         if (insertError) throw insertError;
       }
       
+      // Success message
       const statusMessage = editProforma.status === 'sent' 
         ? '✅ All changes saved! Reset to draft - you can now re-send it with the updated information.'
-        : '✅ Proforma UPDATED successfully - Same proforma, all information saved.';
+        : '✅ Proforma UPDATED successfully - All changes saved to database.';
       
       toast.success(statusMessage);
-      toast.info(`🔒 Original proforma preserved - ${editLineItems.length} item(s) updated`);
+      toast.info(`💾 Saved: ${uniqueItems.length} clean item(s) + all information to database`);
       setShowEdit(false);
       fetchProformas();
     } catch (error: any) {
