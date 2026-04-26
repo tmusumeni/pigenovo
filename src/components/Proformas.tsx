@@ -586,8 +586,38 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   };
 
   const handleEditProforma = (proforma: ProformaWithItems) => {
+    // Clean duplicates from items before opening edit modal
+    let itemsToEdit = proforma.proforma_items || [];
+    
+    if (itemsToEdit.length > 0) {
+      const seen = new Set<string>();
+      const uniqueItems: ProformaItem[] = [];
+      let duplicatesFound = 0;
+      
+      itemsToEdit.forEach(item => {
+        const isDuplicate = uniqueItems.some(u => 
+          u.description === item.description && 
+          u.quantity === item.quantity && 
+          u.unit_price === item.unit_price
+        );
+        
+        if (!isDuplicate) {
+          uniqueItems.push(item);
+        } else {
+          duplicatesFound++;
+        }
+      });
+      
+      // If duplicates were found, show a message
+      if (duplicatesFound > 0) {
+        toast.info(`🧹 Found & cleaned ${duplicatesFound} duplicate item(s) from database`);
+      }
+      
+      itemsToEdit = uniqueItems;
+    }
+    
     setEditProforma(proforma);
-    setEditLineItems(proforma.proforma_items || []);
+    setEditLineItems(itemsToEdit);
     setEditTab('info'); // Always start with info tab
     setShowEdit(true);
   };
