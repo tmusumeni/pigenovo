@@ -166,22 +166,35 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
--- SIMPLE SELECT: Get proformas received by current user
+-- SIMPLE SELECT: Get proformas received by current user (WITH ALL FIELDS)
 -- ============================================================================
 -- Usage: SELECT * FROM get_received_proformas('user-uuid-here');
 
+DROP FUNCTION IF EXISTS public.get_received_proformas(uuid);
+
 CREATE OR REPLACE FUNCTION public.get_received_proformas(p_receiver_user_id uuid)
 RETURNS TABLE (
-  proforma_id uuid,
+  id uuid,
   number text,
   client_name text,
   client_email text,
+  client_phone text,
+  description text,
   amount numeric,
   currency text,
+  proforma_date timestamp,
+  valid_until timestamp,
+  tax_rate numeric,
+  discount_rate numeric,
+  tax_amount numeric,
+  discount_amount numeric,
+  total_amount numeric,
   status text,
+  user_id uuid,
   sent_date timestamp,
   viewed_date timestamp,
-  recipient_status text
+  recipient_status text,
+  created_at timestamp
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -190,12 +203,23 @@ BEGIN
     p.number,
     p.client_name,
     p.client_email,
-    p.total_amount,
+    p.client_phone,
+    p.description,
+    p.amount,
     p.currency,
+    p.proforma_date,
+    p.valid_until,
+    p.tax_rate,
+    p.discount_rate,
+    p.tax_amount,
+    p.discount_amount,
+    p.total_amount,
     p.status,
+    p.user_id,
     pr.sent_date,
     pr.viewed_date,
-    pr.status
+    pr.status as recipient_status,
+    p.created_at
   FROM proformas p
   INNER JOIN proforma_recipients pr ON p.id = pr.proforma_id
   WHERE pr.receiver_user_id = p_receiver_user_id

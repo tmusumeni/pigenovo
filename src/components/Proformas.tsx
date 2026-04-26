@@ -180,21 +180,33 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       if (error) throw error;
       
-      // Ensure all proformas have all required fields with defaults
+      // Process data with all fields from RPC
       const processedData = (data || []).map((proforma: any) => {
-        const subtotal = proforma.amount || 0;
-        const discountAmount = 0; // Will be fetched via items if needed
-        const taxAmount = 0; // Will be fetched via items if needed
-        const totalAmount = proforma.amount || 0;
-        
         return {
           ...proforma,
-          amount: subtotal,
-          discount_amount: discountAmount,
-          tax_amount: taxAmount,
-          total_amount: totalAmount,
-          discount_rate: 0,
-          tax_rate: 0
+          // Map fields properly
+          id: proforma.id,
+          number: proforma.number,
+          client_name: proforma.client_name,
+          client_email: proforma.client_email,
+          client_phone: proforma.client_phone,
+          description: proforma.description,
+          amount: proforma.amount || 0,
+          currency: proforma.currency || 'RWF',
+          proforma_date: proforma.proforma_date,
+          valid_until: proforma.valid_until,
+          tax_rate: proforma.tax_rate || 0,
+          discount_rate: proforma.discount_rate || 0,
+          tax_amount: proforma.tax_amount || 0,
+          discount_amount: proforma.discount_amount || 0,
+          total_amount: proforma.total_amount || proforma.amount || 0,
+          status: proforma.status,
+          user_id: proforma.user_id,
+          sent_date: proforma.sent_date,
+          viewed_date: proforma.viewed_date,
+          recipient_status: proforma.recipient_status,
+          created_at: proforma.created_at,
+          proforma_items: [] // Will load separately if needed
         };
       });
       
