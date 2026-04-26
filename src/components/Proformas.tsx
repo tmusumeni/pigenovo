@@ -633,14 +633,18 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           total_amount: finalTotal,
           
           // Status
-          status: editProforma.status === 'sent' ? 'draft' : editProforma.status
+          status: editProforma.status === 'sent' ? 'draft' : editProforma.status,
+          
+          // Always track that this was updated
+          updated_at: new Date().toISOString()
         })
         .eq('id', editProforma.id);
       
       if (updateError) throw updateError;
       
-      // Delete old items
-      if (editProforma.proforma_items) {
+      // Smart item update: Delete old items and insert new ones
+      // (preserves proforma integrity)
+      if (editProforma.proforma_items && editProforma.proforma_items.length > 0) {
         const { error: deleteError } = await supabase
           .from('proforma_items')
           .delete()
@@ -648,26 +652,46 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         if (deleteError) throw deleteError;
       }
       
-      // Insert new items
-      const itemsToInsert = editLineItems.map(item => ({
-        proforma_id: editProforma.id,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        amount: item.quantity * item.unit_price
-      }));
+      // Only insert items if there are any
+      if (editLineItems.length > 0) {
+        const itemsToInsert = editLineItems.map(item => ({
+          proforma_id: editProforma.id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          amount: item.quantity * item.unit_price
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('proforma_items')
+          .insert(itemsToInsert);
+        
+        if (insertError) throw insertError;
+      }
       
-      const { error: insertError } = await supabase
-        .from('proforma_items')
-        .insert(itemsToInsert);
+      // Determine what changed to show better message
+      let changesSummary = [];
       
-      if (insertError) throw insertError;
+      // Check if client info changed
+      if (editProforma.client_name !== editProforma.client_name) {
+        changesSummary.push('client name');
+      }
+      if (editProforma.client_email !== editProforma.client_email) {
+        changesSummary.push('email');
+      }
+      if (editProforma.client_phone !== editProforma.client_phone) {
+        changesSummary.push('phone');
+      }
+      if (newSubtotal !== (editProforma.amount || 0)) {
+        changesSummary.push('items/amounts');
+      }
       
       const statusMessage = editProforma.status === 'sent' 
         ? '✅ All changes saved! Reset to draft - you can now re-send it with the updated information.'
-        : '✅ Proforma updated successfully! All information and line items saved.';
+        : '✅ Proforma UPDATED successfully - Same proforma, all information saved.';
       
       toast.success(statusMessage);
+      toast.info('🔒 Original proforma preserved - only updated with new changes');
       setShowEdit(false);
       fetchProformas();
     } catch (error: any) {
