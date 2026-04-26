@@ -594,6 +594,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const finalTotal = discountedAmount + taxAmount;
       
       // Update proforma amount and recalculated tax/discount/total
+      // If editing a sent proforma, reset it to draft so it needs to be re-sent
       const { error: updateError } = await supabase
         .from('proformas')
         .update({ 
@@ -602,7 +603,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           discount_rate: editProforma.discount_rate || 0,
           discount_amount: discountAmount,
           tax_amount: taxAmount,
-          total_amount: finalTotal
+          total_amount: finalTotal,
+          status: editProforma.status === 'sent' ? 'draft' : editProforma.status
         })
         .eq('id', editProforma.id);
       
@@ -632,7 +634,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       
       if (insertError) throw insertError;
       
-      toast.success('✅ Proforma updated successfully with new totals');
+      const statusMessage = editProforma.status === 'sent' 
+        ? '✅ Proforma updated! Reset to draft - you can now re-send it to the client.'
+        : '✅ Proforma updated successfully with new totals';
+      
+      toast.success(statusMessage);
       setShowEdit(false);
       fetchProformas();
     } catch (error: any) {
@@ -1219,20 +1225,22 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       Preview
                     </Button>
 
+                    {/* Edit Button - Available for Draft & Sent Only */}
+                    {(proforma.status === 'draft' || proforma.status === 'sent') && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEditProforma(proforma)}
+                        disabled={loading}
+                        className="gap-1"
+                      >
+                        <Edit2 className="h-3 w-3" />
+                        Edit
+                      </Button>
+                    )}
+
                     {proforma.status === 'draft' && (
                       <>
-                        {/* Edit Button - Draft Only */}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditProforma(proforma)}
-                          disabled={loading}
-                          className="gap-1"
-                        >
-                          <Edit2 className="h-3 w-3" />
-                          Edit
-                        </Button>
-
                         {/* Export Buttons - Draft Only */}
                         <Button
                           size="sm"
