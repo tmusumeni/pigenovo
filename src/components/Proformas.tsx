@@ -585,6 +585,24 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setShowPreview(true);
   };
 
+  // Helper function to get unique items (remove duplicates for display)
+  const getUniqueItems = (items: ProformaItem[] | undefined) => {
+    if (!items || items.length === 0) return [];
+    
+    const uniqueItems: ProformaItem[] = [];
+    items.forEach(item => {
+      const isDuplicate = uniqueItems.some(u => 
+        u.description === item.description && 
+        u.quantity === item.quantity && 
+        u.unit_price === item.unit_price
+      );
+      if (!isDuplicate) {
+        uniqueItems.push(item);
+      }
+    });
+    return uniqueItems;
+  };
+
   const handleEditProforma = async (proforma: ProformaWithItems) => {
     try {
       let itemsToEdit = proforma.proforma_items || [];
@@ -876,7 +894,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         </div>
         
         <div class="section">
-          <div class="label">Line Items:</div>
+          <div class="label">Line Items (Unique):</div>
           <table>
             <tr>
               <th>Description</th>
@@ -884,7 +902,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <th>Unit Price</th>
               <th>Total Price</th>
             </tr>
-            ${proforma.proforma_items?.map(item => `
+            ${getUniqueItems(proforma.proforma_items)?.map(item => `
               <tr>
                 <td>${item.description}</td>
                 <td align="right">${item.quantity}</td>
@@ -1311,11 +1329,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         </div>
                       )}
 
-                      {/* Line Items Display */}
+                      {/* Line Items Display - UNIQUE ONLY */}
                       {proforma.proforma_items && proforma.proforma_items.length > 0 && (
                         <div className="mt-3 text-xs">
                           <div className="border-t pt-2">
-                            {proforma.proforma_items.map((item, idx) => (
+                            {getUniqueItems(proforma.proforma_items).map((item, idx) => (
                               <div key={idx} className="flex justify-between py-1 px-2 bg-muted/50 rounded mb-1">
                                 <span>{item.description}</span>
                                 <span className="text-right">
@@ -1498,10 +1516,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       <p className="text-sm text-muted-foreground mb-3 italic">{proforma.description}</p>
                     )}
 
-                    {/* Items Summary */}
+                    {/* Items Summary - UNIQUE ONLY */}
                     <div className="mb-3 text-sm bg-white p-2 rounded">
                       <p className="font-semibold mb-1">Items:</p>
-                      {proforma.proforma_items?.map((item, idx) => (
+                      {getUniqueItems(proforma.proforma_items).map((item, idx) => (
                         <div key={idx} className="flex justify-between text-xs">
                           <span>{item.description} × {item.quantity}</span>
                           <span>{(item.quantity * item.unit_price).toLocaleString()}</span>
@@ -1635,7 +1653,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
               {previewProforma.proforma_items && previewProforma.proforma_items.length > 0 && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Line Items</p>
+                  <p className="text-xs text-muted-foreground mb-2">Line Items - UNIQUE ONLY</p>
                   <table className="w-full text-sm border rounded">
                     <thead className="bg-muted">
                       <tr>
@@ -1646,7 +1664,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       </tr>
                     </thead>
                     <tbody>
-                      {previewProforma.proforma_items.map((item, idx) => (
+                      {getUniqueItems(previewProforma.proforma_items).map((item, idx) => (
                         <tr key={idx} className="border-t">
                           <td className="p-2">{item.description}</td>
                           <td className="p-2 text-right">{item.quantity}</td>
