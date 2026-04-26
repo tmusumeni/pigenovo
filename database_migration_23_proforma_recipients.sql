@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS public.proforma_recipients (
 );
 
 -- Create indexes for fast queries
-CREATE INDEX idx_proforma_recipients_receiver ON public.proforma_recipients(receiver_user_id);
-CREATE INDEX idx_proforma_recipients_proforma ON public.proforma_recipients(proforma_id);
-CREATE INDEX idx_proforma_recipients_status ON public.proforma_recipients(status);
+CREATE INDEX IF NOT EXISTS idx_proforma_recipients_receiver ON public.proforma_recipients(receiver_user_id);
+CREATE INDEX IF NOT EXISTS idx_proforma_recipients_proforma ON public.proforma_recipients(proforma_id);
+CREATE INDEX IF NOT EXISTS idx_proforma_recipients_status ON public.proforma_recipients(status);
 
 -- ============================================================================
 -- RPC FUNCTION: Send proforma to receiver (NEW VERSION)
