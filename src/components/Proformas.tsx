@@ -585,41 +585,59 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setShowPreview(true);
   };
 
-  const handleEditProforma = (proforma: ProformaWithItems) => {
-    // Clean duplicates from items before opening edit modal
-    let itemsToEdit = proforma.proforma_items || [];
-    
-    if (itemsToEdit.length > 0) {
-      const seen = new Set<string>();
-      const uniqueItems: ProformaItem[] = [];
-      let duplicatesFound = 0;
+  const handleEditProforma = async (proforma: ProformaWithItems) => {
+    try {
+      let itemsToEdit = proforma.proforma_items || [];
+      let duplicatesRemoved = 0;
       
-      itemsToEdit.forEach(item => {
-        const isDuplicate = uniqueItems.some(u => 
-          u.description === item.description && 
-          u.quantity === item.quantity && 
-          u.unit_price === item.unit_price
-        );
+      if (itemsToEdit.length > 0) {
+        // Detect duplicates
+        const uniqueItems: ProformaItem[] = [];
+        const duplicateIds: string[] = [];
         
-        if (!isDuplicate) {
-          uniqueItems.push(item);
-        } else {
-          duplicatesFound++;
+        itemsToEdit.forEach(item => {
+          const isDuplicate = uniqueItems.some(u => 
+            u.description === item.description && 
+            u.quantity === item.quantity && 
+            u.unit_price === item.unit_price
+          );
+          
+          if (!isDuplicate) {
+            uniqueItems.push(item);
+          } else {
+            // Mark as duplicate to delete
+            if (item.id) {
+              duplicateIds.push(item.id);
+              duplicatesRemoved++;
+            }
+          }
+        });
+        
+        // DELETE duplicate items from database immediately
+        if (duplicateIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('proforma_items')
+            .delete()
+            .in('id', duplicateIds);
+          
+          if (deleteError) {
+            console.error('Error deleting duplicates:', deleteError);
+            toast.error('Failed to clean duplicates from database');
+          } else {
+            toast.success(`🧹 Deleted ${duplicatesRemoved} duplicate item(s) from database!`);
+          }
         }
-      });
-      
-      // If duplicates were found, show a message
-      if (duplicatesFound > 0) {
-        toast.info(`🧹 Found & cleaned ${duplicatesFound} duplicate item(s) from database`);
+        
+        itemsToEdit = uniqueItems;
       }
       
-      itemsToEdit = uniqueItems;
+      setEditProforma(proforma);
+      setEditLineItems(itemsToEdit);
+      setEditTab('info');
+      setShowEdit(true);
+    } catch (error: any) {
+      toast.error('Error opening edit: ' + error.message);
     }
-    
-    setEditProforma(proforma);
-    setEditLineItems(itemsToEdit);
-    setEditTab('info'); // Always start with info tab
-    setShowEdit(true);
   };
 
   const handleSaveEditedProforma = async () => {
