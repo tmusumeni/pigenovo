@@ -598,6 +598,28 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     try {
       setLoading(true);
       
+      // VALIDATION: Check for empty proforma
+      if (editLineItems.length === 0) {
+        toast.error('❌ Cannot save: No items found. Add at least one line item.');
+        setLoading(false);
+        return;
+      }
+      
+      // VALIDATION: Check for duplicate items
+      const seen = new Set<string>();
+      const hasDuplicates = editLineItems.some(item => {
+        const key = `${item.description}|${item.quantity}|${item.unit_price}`;
+        if (seen.has(key)) return true;
+        seen.add(key);
+        return false;
+      });
+      
+      if (hasDuplicates) {
+        toast.error('⚠️ Duplicate items detected! Click "Remove Duplicates" first.');
+        setLoading(false);
+        return;
+      }
+      
       // Calculate new total from edited items
       const newSubtotal = editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
       
@@ -652,7 +674,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         if (deleteError) throw deleteError;
       }
       
-      // Only insert items if there are any
+      // Only insert items if there are any (already validated above)
       if (editLineItems.length > 0) {
         const itemsToInsert = editLineItems.map(item => ({
           proforma_id: editProforma.id,
@@ -669,29 +691,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         if (insertError) throw insertError;
       }
       
-      // Determine what changed to show better message
-      let changesSummary = [];
-      
-      // Check if client info changed
-      if (editProforma.client_name !== editProforma.client_name) {
-        changesSummary.push('client name');
-      }
-      if (editProforma.client_email !== editProforma.client_email) {
-        changesSummary.push('email');
-      }
-      if (editProforma.client_phone !== editProforma.client_phone) {
-        changesSummary.push('phone');
-      }
-      if (newSubtotal !== (editProforma.amount || 0)) {
-        changesSummary.push('items/amounts');
-      }
-      
       const statusMessage = editProforma.status === 'sent' 
         ? '✅ All changes saved! Reset to draft - you can now re-send it with the updated information.'
         : '✅ Proforma UPDATED successfully - Same proforma, all information saved.';
       
       toast.success(statusMessage);
-      toast.info('🔒 Original proforma preserved - only updated with new changes');
+      toast.info(`🔒 Original proforma preserved - ${editLineItems.length} item(s) updated`);
       setShowEdit(false);
       fetchProformas();
     } catch (error: any) {
@@ -1770,7 +1775,41 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 <div className="space-y-6">
                   {/* Line Items Section */}
                   <div className="bg-green-50 border border-green-200 rounded p-4 space-y-3">
-                    <h3 className="font-semibold text-green-900">📦 Line Items</h3>
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-green-900">📦 Line Items ({editLineItems.length})</h3>
+                      {editLineItems.length > 0 && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            // Check for exact duplicates and remove them
+                            const seen = new Set<string>();
+                            const unique = editLineItems.filter(item => {
+                              const key = `${item.description}|${item.quantity}|${item.unit_price}`;
+                              if (seen.has(key)) return false;
+                              seen.add(key);
+                              return true;
+                            });
+                            if (unique.length < editLineItems.length) {
+                              setEditLineItems(unique);
+                              toast.info(`🧹 Removed ${editLineItems.length - unique.length} duplicate item(s)`);
+                            } else {
+                              toast.info('✅ No duplicates found');
+                            }
+                          }}
+                          className="text-xs"
+                        >
+                          🧹 Remove Duplicates
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {editLineItems.length === 0 && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                        ⚠️ No items added yet. Click "Add Line Item" to add at least one.
+                      </div>
+                    )}
+                    
                     <div className="space-y-2">
                       {editLineItems.map((item, idx) => (
                         <div key={idx} className="flex gap-2 p-2 border rounded bg-white">
@@ -1786,17 +1825,18 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                               size="sm"
                             />
                           </div>
-                          <div className="w-20">
+                          <div className="w-16">
                             <Input
                               type="number"
                               placeholder="Qty"
                               value={item.quantity}
                               onChange={(e) => {
                                 const updated = [...editLineItems];
-                                updated[idx].quantity = Number(e.target.value);
+                                updated[idx].quantity = Math.max(1, Number(e.target.value));
                                 setEditLineItems(updated);
                               }}
                               size="sm"
+                              min="1"
                             />
                           </div>
                           <div className="w-24">
