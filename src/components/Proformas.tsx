@@ -593,17 +593,32 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const taxAmount = (discountedAmount * (editProforma.tax_rate || 0)) / 100;
       const finalTotal = discountedAmount + taxAmount;
       
-      // Update proforma amount and recalculated tax/discount/total
+      // Update proforma with ALL fields: client info, dates, amounts, etc.
       // If editing a sent proforma, reset it to draft so it needs to be re-sent
       const { error: updateError } = await supabase
         .from('proformas')
         .update({ 
+          // Client Information
+          client_name: editProforma.client_name,
+          client_email: editProforma.client_email,
+          client_phone: editProforma.client_phone,
+          currency: editProforma.currency,
+          
+          // Proforma Details
+          number: editProforma.number,
+          description: editProforma.description,
+          proforma_date: editProforma.proforma_date,
+          valid_until: editProforma.valid_until,
+          
+          // Amounts
           amount: newSubtotal,
           tax_rate: editProforma.tax_rate || 0,
           discount_rate: editProforma.discount_rate || 0,
           discount_amount: discountAmount,
           tax_amount: taxAmount,
           total_amount: finalTotal,
+          
+          // Status
           status: editProforma.status === 'sent' ? 'draft' : editProforma.status
         })
         .eq('id', editProforma.id);
@@ -635,8 +650,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       if (insertError) throw insertError;
       
       const statusMessage = editProforma.status === 'sent' 
-        ? '✅ Proforma updated! Reset to draft - you can now re-send it to the client.'
-        : '✅ Proforma updated successfully with new totals';
+        ? '✅ All changes saved! Reset to draft - you can now re-send it with the updated information.'
+        : '✅ Proforma updated successfully! All information and line items saved.';
       
       toast.success(statusMessage);
       setShowEdit(false);
@@ -1590,17 +1605,101 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setShowEdit(false)}
         >
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle>Edit: {editProforma.number}</CardTitle>
-                <CardDescription>Modify line items before converting</CardDescription>
+                <CardTitle>✏️ Edit Proforma: {editProforma.number}</CardTitle>
+                <CardDescription>Update any information - dates, emails, items, rates, etc.</CardDescription>
               </div>
               <Button variant="ghost" onClick={() => setShowEdit(false)}>✕</Button>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Line Items</Label>
+            <CardContent className="space-y-6">
+              
+              {/* Client Information Section */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-4 space-y-3">
+                <h3 className="font-semibold text-blue-900">👤 Client Information</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Client Name</Label>
+                    <Input
+                      value={editProforma.client_name}
+                      onChange={(e) => setEditProforma({ ...editProforma, client_name: e.target.value })}
+                      placeholder="Enter client name"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Client Email</Label>
+                    <Input
+                      type="email"
+                      value={editProforma.client_email || ''}
+                      onChange={(e) => setEditProforma({ ...editProforma, client_email: e.target.value })}
+                      placeholder="client@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Client Phone</Label>
+                    <Input
+                      value={editProforma.client_phone}
+                      onChange={(e) => setEditProforma({ ...editProforma, client_phone: e.target.value })}
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Currency</Label>
+                    <Input
+                      value={editProforma.currency}
+                      onChange={(e) => setEditProforma({ ...editProforma, currency: e.target.value })}
+                      placeholder="RWF, USD, etc"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Proforma Details Section */}
+              <div className="bg-purple-50 border border-purple-200 rounded p-4 space-y-3">
+                <h3 className="font-semibold text-purple-900">📋 Proforma Details</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Proforma Number</Label>
+                    <Input
+                      value={editProforma.number}
+                      onChange={(e) => setEditProforma({ ...editProforma, number: e.target.value })}
+                      placeholder="PRO-001"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Description</Label>
+                    <Input
+                      value={editProforma.description}
+                      onChange={(e) => setEditProforma({ ...editProforma, description: e.target.value })}
+                      placeholder="e.g., Website Development"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Proforma Date</Label>
+                    <Input
+                      type="date"
+                      value={editProforma.proforma_date?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                      onChange={(e) => setEditProforma({ ...editProforma, proforma_date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Valid Until</Label>
+                    <Input
+                      type="date"
+                      value={editProforma.valid_until?.split('T')[0] || ''}
+                      onChange={(e) => setEditProforma({ ...editProforma, valid_until: e.target.value })}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Line Items Section */}
+              <div className="bg-green-50 border border-green-200 rounded p-4 space-y-3">
+                <h3 className="font-semibold text-green-900">📦 Line Items</h3>
                 <div className="space-y-2 mt-2">
                   {editLineItems.map((item, idx) => (
                     <div key={idx} className="flex gap-2 p-2 border rounded bg-muted/50">
@@ -1655,36 +1754,56 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                     </div>
                   ))}
                 </div>
+
+                {/* Add New Line Item Button */}
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    setEditLineItems([...editLineItems, { description: '', quantity: 1, unit_price: 0 }]);
+                  }}
+                  className="w-full gap-1 mt-3"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add Line Item
+                </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <Label>Discount Rate (%)</Label>
-                  <Input
-                    type="number"
-                    value={editProforma.discount_rate || 0}
-                    onChange={(e) => setEditProforma({ ...editProforma, discount_rate: Number(e.target.value) })}
-                    placeholder="0"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                  />
-                </div>
-                <div>
-                  <Label>Tax Rate (%)</Label>
-                  <Input
-                    type="number"
-                    value={editProforma.tax_rate || 0}
-                    onChange={(e) => setEditProforma({ ...editProforma, tax_rate: Number(e.target.value) })}
-                    placeholder="0"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                  />
+              {/* Tax & Discount Section */}
+              <div className="bg-orange-50 border border-orange-200 rounded p-4 space-y-3">
+                <h3 className="font-semibold text-orange-900">💰 Tax & Discount</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Discount Rate (%)</Label>
+                    <Input
+                      type="number"
+                      value={editProforma.discount_rate || 0}
+                      onChange={(e) => setEditProforma({ ...editProforma, discount_rate: Number(e.target.value) })}
+                      placeholder="0"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Tax Rate (%)</Label>
+                    <Input
+                      type="number"
+                      value={editProforma.tax_rate || 0}
+                      onChange={(e) => setEditProforma({ ...editProforma, tax_rate: Number(e.target.value) })}
+                      placeholder="0"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded border border-green-200 space-y-2 mb-4">
+              {/* Price Summary */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded border border-green-200 space-y-2">
+                <h3 className="font-semibold text-green-900">💵 Price Summary</h3>
                 {(() => {
                   const subtotal = editLineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
                   const discountAmount = (subtotal * (editProforma.discount_rate || 0)) / 100;
@@ -1694,24 +1813,47 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   
                   return (
                     <>
-                      <p className="text-xs text-muted-foreground">Subtotal: {subtotal.toLocaleString()} {editProforma.currency}</p>
-                      {editProforma.discount_rate ? (
-                        <p className="text-xs text-orange-600">Discount ({editProforma.discount_rate}%): -{discountAmount.toLocaleString()} {editProforma.currency}</p>
-                      ) : null}
-                      {editProforma.tax_rate ? (
-                        <p className="text-xs text-blue-600">Tax ({editProforma.tax_rate}%): +{taxAmount.toLocaleString()} {editProforma.currency}</p>
-                      ) : null}
-                      <p className="text-sm font-bold text-green-600 mt-2">Final Total: {total.toLocaleString()} {editProforma.currency}</p>
+                      <div className="grid grid-cols-2 text-sm">
+                        <span className="text-muted-foreground">Subtotal:</span>
+                        <span className="font-semibold text-right">{subtotal.toLocaleString()} {editProforma.currency}</span>
+                      </div>
+                      {editProforma.discount_rate > 0 && (
+                        <div className="grid grid-cols-2 text-sm text-orange-600">
+                          <span>Discount ({editProforma.discount_rate}%):</span>
+                          <span className="font-semibold text-right">-{discountAmount.toLocaleString()} {editProforma.currency}</span>
+                        </div>
+                      )}
+                      {editProforma.tax_rate > 0 && (
+                        <div className="grid grid-cols-2 text-sm text-blue-600">
+                          <span>Tax ({editProforma.tax_rate}%):</span>
+                          <span className="font-semibold text-right">+{taxAmount.toLocaleString()} {editProforma.currency}</span>
+                        </div>
+                      )}
+                      <div className="border-t pt-2 grid grid-cols-2 text-sm font-bold text-green-600">
+                        <span>Final Total:</span>
+                        <span className="text-right text-lg">{total.toLocaleString()} {editProforma.currency}</span>
+                      </div>
                     </>
                   );
                 })()}
               </div>
 
-              <div className="flex gap-2">
-                <Button onClick={handleSaveEditedProforma} disabled={loading} className="flex-1">
-                  {loading ? 'Saving...' : 'Save Changes'}
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button 
+                  onClick={handleSaveEditedProforma} 
+                  disabled={loading} 
+                  className="flex-1 gap-2"
+                  size="lg"
+                >
+                  {loading ? '💾 Saving...' : '💾 Save All Changes'}
                 </Button>
-                <Button variant="outline" onClick={() => setShowEdit(false)} className="flex-1">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowEdit(false)} 
+                  className="flex-1"
+                  size="lg"
+                >
                   Cancel
                 </Button>
               </div>
