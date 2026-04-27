@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { platformWalletService } from '@/lib/platformWalletService';
 import { 
   XAxis, 
   YAxis, 
@@ -502,7 +503,7 @@ export function TradingExchange({ user }: { user: any }) {
       const fee = totalCost * 0.001;
       const quantity = (totalCost - fee) / selectedAsset!.price;
 
-      const { error: tradeError } = await supabase.from('trades').insert({
+      const { data: tradeData, error: tradeError } = await supabase.from('trades').insert({
         user_id: user.id,
         asset_id: selectedAsset!.id,
         type,
@@ -513,9 +514,19 @@ export function TradingExchange({ user }: { user: any }) {
         entry_price: entryPrice ? Number(entryPrice) : selectedAsset!.price,
         stop_loss: stopLoss ? Number(stopLoss) : null,
         take_profit: takeProfit ? Number(takeProfit) : null
-      });
+      }).select();
 
       if (tradeError) throw tradeError;
+
+      const tradeId = tradeData?.[0]?.id;
+
+      // ========================================
+      // LOG TRADING FEE TO PLATFORM WALLET
+      // ========================================
+      if (fee > 0 && tradeId) {
+        await platformWalletService.addTradingFee(tradeId, user.id, fee);
+      }
+      // ========================================
 
       const newBalance = currentBalance - totalCost;
       const { error: walletError } = await supabase
@@ -560,7 +571,9 @@ export function TradingExchange({ user }: { user: any }) {
       
       const currentBalance = Number(wallet?.balance) || 0;
       const fee = finalReturn * 0.001;
-      const { error: tradeError } = await supabase.from('trades').insert({
+      
+      // Insert closing trade record
+      const { data: tradeData, error: tradeError } = await supabase.from('trades').insert({
         user_id: user.id,
         asset_id: pos.asset_id,
         type: pos.type === 'buy' ? 'sell' : 'buy', // Record opposite to close
@@ -568,10 +581,33 @@ export function TradingExchange({ user }: { user: any }) {
         asset_quantity: pos.quantity,
         price_at_trade: asset.price,
         fee
-      });
+      }).select();
 
       if (tradeError) throw tradeError;
+      
+      const tradeId = tradeData?.[0]?.id;
 
+      // ========================================
+      // PLATFORM WALLET TRANSACTIONS
+      // ========================================
+      // Log trading fee to platform
+      if (fee > 0 && tradeId) {
+        await platformWalletService.addTradingFee(tradeId, user.id, fee);
+      }
+
+      // Handle P&L: Loss goes to platform, Profit comes from platform
+      if (pos.pnl !== 0 && tradeId) {
+        if (pos.pnl < 0) {
+          // USER LOSS → PLATFORM GAINS
+          await platformWalletService.logUserLoss(tradeId, user.id, Math.abs(pos.pnl));
+        } else {
+          // USER PROFIT → PLATFORM PAYS
+          await platformWalletService.handleUserProfit(tradeId, user.id, pos.pnl);
+        }
+      }
+      // ========================================
+
+      // Update user wallet (profit/loss already accounted for in finalReturn calculation)
       const newBalance = currentBalance + (finalReturn - fee);
       const { error: walletError } = await supabase
         .from('wallets')
