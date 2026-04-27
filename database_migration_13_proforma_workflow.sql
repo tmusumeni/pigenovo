@@ -55,25 +55,12 @@ create policy "Users can only delete their own proformas"
   on proformas for delete
   using (auth.uid() = user_id or status = 'draft');
 
-create policy "Receivers can see proformas sent to them"
-  on proformas for select
-  using (exists (select 1 from proforma_recipients where proforma_recipients.proforma_id = proformas.id and proforma_recipients.receiver_user_id = auth.uid()));
-
 -- RLS Policies for Proforma Items
 alter table proforma_items enable row level security;
 
 create policy "Users can see proforma items for their proformas"
   on proforma_items for select
   using (exists (select 1 from proformas where id = proforma_id and user_id = auth.uid()));
-
-create policy "Receivers can see proforma items for proformas sent to them"
-  on proforma_items for select
-  using (exists (
-    select 1 from proformas p
-    inner join proforma_recipients pr on p.id = pr.proforma_id
-    where p.id = proforma_id
-    and pr.receiver_user_id = auth.uid()
-  ));
 
 create policy "Users can create proforma items for their proformas"
   on proforma_items for insert

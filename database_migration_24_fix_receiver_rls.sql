@@ -27,69 +27,16 @@ CREATE POLICY "Users can view their received proformas"
   FOR SELECT
   USING (auth.uid() = receiver_user_id);
 
--- Allow senders to view who they sent proformas to (for tracking)
-CREATE POLICY "Senders can view their sent proformas recipients"
-  ON public.proforma_recipients
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.proformas
-      WHERE proformas.id = proforma_recipients.proforma_id
-      AND proformas.user_id = auth.uid()
-    )
-  );
-
--- Allow RPC functions to insert (with SECURITY DEFINER, this won't be used but kept for clarity)
-CREATE POLICY "RPC functions can insert recipients"
-  ON public.proforma_recipients
-  FOR INSERT
-  WITH CHECK (true);
-
--- Allow RPC functions to update (with SECURITY DEFINER)
-CREATE POLICY "RPC functions can update recipients"
-  ON public.proforma_recipients
-  FOR UPDATE
-  USING (true)
-  WITH CHECK (true);
+-- Allow RPC functions to insert/update (with SECURITY DEFINER)
+-- Senders don't need to query proforma_recipients directly; RPC functions handle this
 
 -- ============================================================================
--- ADD ADDITIONAL RLS POLICIES TO PROFORMAS TABLE
+-- RPC FUNCTIONS HANDLE PROFORMA ACCESS FOR RECEIVERS
 -- ============================================================================
-
--- Drop existing policy if it exists
-DROP POLICY IF EXISTS "Receivers can see proformas sent to them" ON public.proformas;
-
--- Add policy to allow receivers to see proformas sent to them
-CREATE POLICY "Receivers can see proformas sent to them"
-  ON public.proformas
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.proforma_recipients
-      WHERE proforma_recipients.proforma_id = proformas.id
-      AND proforma_recipients.receiver_user_id = auth.uid()
-    )
-  );
-
--- ============================================================================
--- ADD ADDITIONAL RLS POLICIES TO PROFORMA_ITEMS TABLE
--- ============================================================================
-
--- Drop existing policy if it exists
-DROP POLICY IF EXISTS "Receivers can see proforma items for proformas sent to them" ON public.proforma_items;
-
--- Add policy to allow receivers to see items in proformas sent to them
-CREATE POLICY "Receivers can see proforma items for proformas sent to them"
-  ON public.proforma_items
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.proformas p
-      INNER JOIN public.proforma_recipients pr ON p.id = pr.proforma_id
-      WHERE p.id = proforma_items.proforma_id
-      AND pr.receiver_user_id = auth.uid()
-    )
-  );
+-- No additional RLS policies needed on proformas or proforma_items tables
+-- because the RPC functions (get_received_proformas, recipient_accept_proforma,
+-- recipient_reject_proforma) have SECURITY DEFINER and bypass RLS.
+-- These functions handle all authorization logic internally.
 
 -- ============================================================================
 -- VERIFY FUNCTIONS EXIST AND HAVE CORRECT PERMISSIONS
@@ -106,16 +53,18 @@ GRANT EXECUTE ON FUNCTION public.get_received_proformas(uuid) TO authenticated;
 -- ============================================================================
 /*
   This migration fixes the "0 received proformas" issue by:
-  1. Adding RLS policies to proforma_recipients table
-     - Receivers can see their received proformas
-     - Senders can see who they sent to
-     - RPC functions can insert/update
   
-  2. Adding RLS policy to proformas table
-     - Receivers can see proformas sent to them
+  1. Enabling RLS on proforma_recipients table
+  2. Adding single policy: Receivers can see their received proformas
+     - Only receivers listed in proforma_recipients.receiver_user_id can see their rows
   
-  3. Adding RLS policy to proforma_items table
-     - Receivers can see items in proformas sent to them
+  3. RPC functions handle all proformas/proforma_items access
+     - get_received_proformas() has SECURITY DEFINER (bypasses RLS)
+     - recipient_accept_proforma() has SECURITY DEFINER
+     - recipient_reject_proforma() has SECURITY DEFINER
+     - These functions authorize users internally
+  
+  This avoids circular RLS policy references.
   
   After running this migration:
   - Receivers will see all proformas sent to them in the "Received Proformas" tab
