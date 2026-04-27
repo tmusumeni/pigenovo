@@ -79,6 +79,9 @@ export function AdminPanel() {
   const [adUploading, setAdUploading] = useState(false);
   
   const [allTrades, setAllTrades] = useState<any[]>([]);
+  const [platformWallet, setPlatformWallet] = useState<any>(null);
+  const [platformEarnings, setPlatformEarnings] = useState<any[]>([]);
+  const [earningsSummary, setEarningsSummary] = useState<any>(null);
   
   const [loading, setLoading] = useState(false);
 
@@ -96,6 +99,9 @@ export function AdminPanel() {
     fetchAllProfiles();
     fetchAllTrades();
     fetchUserWalletData();
+    fetchPlatformWallet();
+    fetchPlatformEarnings();
+    fetchEarningsSummary();
 
     // REAL-TIME SUBSCRIPTIONS
     const financeChannel = supabase
@@ -360,6 +366,75 @@ export function AdminPanel() {
       setUserWalletData(enrichedData);
     } catch (error) {
       console.error('Error fetching wallet data:', error);
+    }
+  };
+
+  const fetchPlatformWallet = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('platform_wallet')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error('Error fetching platform wallet:', error);
+        // Initialize if not exists
+        const { data: initData } = await supabase
+          .from('platform_wallet')
+          .insert({ balance: 0, total_earnings: 0 })
+          .select()
+          .single();
+        setPlatformWallet(initData);
+      } else {
+        setPlatformWallet(data);
+      }
+    } catch (error) {
+      console.error('Error in fetchPlatformWallet:', error);
+    }
+  };
+
+  const fetchPlatformEarnings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('platform_earnings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setPlatformEarnings(data || []);
+    } catch (error) {
+      console.error('Error fetching platform earnings:', error);
+    }
+  };
+
+  const fetchEarningsSummary = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('platform_earnings')
+        .select('earnings_type, amount')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group by earnings_type and sum amounts
+      const summary: any = {};
+      (data || []).forEach((item: any) => {
+        if (!summary[item.earnings_type]) {
+          summary[item.earnings_type] = {
+            type: item.earnings_type,
+            total: 0,
+            count: 0
+          };
+        }
+        summary[item.earnings_type].total += Number(item.amount);
+        summary[item.earnings_type].count += 1;
+      });
+
+      setEarningsSummary(Object.values(summary));
+    } catch (error) {
+      console.error('Error fetching earnings summary:', error);
     }
   };
 
@@ -1058,6 +1133,9 @@ export function AdminPanel() {
             )}
           </TabsTrigger>
           <TabsTrigger value="trades" className="rounded-lg">All Trades</TabsTrigger>
+          <TabsTrigger value="platform-wallet" className="rounded-lg flex gap-2 items-center">
+            💼 Platform Wallet
+          </TabsTrigger>
           <TabsTrigger value="wallets" className="rounded-lg flex gap-2 items-center">
             💰 Wallet Analytics
           </TabsTrigger>
@@ -1785,6 +1863,201 @@ export function AdminPanel() {
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="platform-wallet" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Platform Balance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {platformWallet ? (
+                    <>
+                      {Number(platformWallet.balance).toLocaleString('en-US', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      })} RWF
+                    </>
+                  ) : (
+                    '0.00 RWF'
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Current wallet balance</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Total Earnings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-600">
+                  {platformWallet ? (
+                    <>
+                      {Number(platformWallet.total_earnings).toLocaleString('en-US', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      })} RWF
+                    </>
+                  ) : (
+                    '0.00 RWF'
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">All time earnings</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Trading Fees</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {platformWallet ? (
+                    <>
+                      {Number(platformWallet.total_trading_fees).toLocaleString('en-US', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      })} RWF
+                    </>
+                  ) : (
+                    '0.00 RWF'
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">From 0.1% trade fees</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">User Losses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-600">
+                  {platformWallet ? (
+                    <>
+                      {Number(platformWallet.total_user_losses).toLocaleString('en-US', { 
+                        minimumFractionDigits: 2, 
+                        maximumFractionDigits: 2 
+                      })} RWF
+                    </>
+                  ) : (
+                    '0.00 RWF'
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">From user trading losses</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex gap-2 items-center">
+                <BarChart3 className="w-5 h-5" />
+                Earnings Breakdown
+              </CardTitle>
+              <CardDescription>Summary by earnings type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {earningsSummary && earningsSummary.length > 0 ? (
+                  earningsSummary.map((summary: any, idx: number) => (
+                    <div key={idx} className="border rounded-lg p-4 bg-muted/30">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-semibold capitalize">
+                          {summary.type.replace('_', ' ')}
+                        </div>
+                        <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
+                          {summary.count} tx
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {Number(summary.total).toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })} RWF
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Avg: {Number(summary.total / summary.count).toLocaleString('en-US', {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        })} RWF/tx
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-3 text-center py-8 text-muted-foreground">
+                    No earnings data yet
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex gap-2 items-center">
+                <Activity className="w-5 h-5" />
+                Recent Platform Earnings
+              </CardTitle>
+              <CardDescription>Latest 100 transactions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground">
+                      <th className="text-left pb-3 font-medium">Type</th>
+                      <th className="text-left pb-3 font-medium">Description</th>
+                      <th className="text-left pb-3 font-medium">Source</th>
+                      <th className="text-right pb-3 font-medium">Amount (RWF)</th>
+                      <th className="text-left pb-3 font-medium">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {platformEarnings.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                          No transactions recorded yet
+                        </td>
+                      </tr>
+                    ) : (
+                      platformEarnings.map((earning: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-muted/30">
+                          <td className="py-3">
+                            <span className="inline-block bg-primary/20 text-primary text-[10px] font-bold px-2 py-1 rounded capitalize">
+                              {earning.earnings_type.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="py-3 max-w-xs truncate">
+                            <div className="text-xs">{earning.description || 'N/A'}</div>
+                          </td>
+                          <td className="py-3">
+                            <div className="text-xs text-muted-foreground">
+                              {earning.source_type || 'N/A'}
+                            </div>
+                          </td>
+                          <td className="py-3 text-right font-mono font-semibold">
+                            <span className={earning.amount > 0 ? 'text-green-600' : 'text-red-600'}>
+                              {earning.amount > 0 ? '+' : ''}{Number(earning.amount).toLocaleString('en-US', { 
+                                minimumFractionDigits: 2, 
+                                maximumFractionDigits: 2 
+                              })}
+                            </span>
+                          </td>
+                          <td className="py-3 text-xs text-muted-foreground">
+                            {earning.created_at ? new Date(earning.created_at).toLocaleDateString() + ' ' + new Date(earning.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

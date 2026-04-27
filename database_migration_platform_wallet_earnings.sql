@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.platform_earnings (
   source_id UUID,  -- Reference to trade, proforma, etc.
   source_type VARCHAR(50),  -- 'trade', 'proforma', 'advertising'
   amount NUMERIC(20, 2) NOT NULL,
-  user_id UUID REFERENCES public.auth.users(id),
+  user_id UUID,  -- Reference to auth.users (no foreign key constraint due to schema separation)
   description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
