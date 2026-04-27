@@ -172,14 +172,26 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const fetchReceivedProformas = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.warn('No user found');
+        return;
+      }
+
+      console.log('Fetching received proformas for user:', user.id);
 
       // Get received proformas using new RPC function
       const { data, error } = await supabase.rpc('get_received_proformas', {
         p_receiver_user_id: user.id
       });
 
-      if (error) throw error;
+      console.log('RPC response:', { data, error });
+
+      if (error) {
+        console.error('RPC error:', error);
+        throw error;
+      }
+      
+      console.log('Raw data from RPC:', data);
       
       // Process data with all fields from RPC
       const processedData = (data || []).map((proforma: any) => {
@@ -211,6 +223,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         };
       });
       
+      console.log('Processed data:', processedData);
+      
       // ✨ DETECT AND NOTIFY ABOUT NEW PROFORMAS
       const newProformaIds = processedData
         .filter(p => !lastNotifiedIds.has(p.id))
@@ -235,6 +249,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       setReceivedProformas(processedData);
     } catch (error: any) {
       console.error('Error fetching received proformas:', error.message);
+      toast.error(`Error loading received proformas: ${error.message}`);
     }
   };
 
