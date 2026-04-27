@@ -529,14 +529,17 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         throw new Error(data?.error || 'Failed to accept proforma');
       }
       
-      // 📧 Send notification email to sender
-      await supabase.rpc('send_status_notification_email', {
-        p_proforma_id: proforma.id,
-        p_notification_type: 'accepted',
-        p_notifier_user_id: currentUser.id
-      }).catch((err: any) => {
+      // 📧 Send notification email to sender (don't block on this)
+      try {
+        await supabase.rpc('send_status_notification_email', {
+          p_proforma_id: proforma.id,
+          p_notification_type: 'accepted',
+          p_notifier_user_id: currentUser.id
+        });
         console.log('Notification sent to sender');
-      });
+      } catch (emailErr) {
+        console.log('Could not send email notification:', emailErr);
+      }
       
       toast.success(t('proforma.accept_quotation'));
       toast.info(`✅ Sender has been notified that you accepted proforma #${proforma.number}`);
@@ -568,14 +571,17 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         throw new Error(data?.error || 'Failed to reject proforma');
       }
       
-      // 📧 Send notification email to sender
-      await supabase.rpc('send_status_notification_email', {
-        p_proforma_id: proforma.id,
-        p_notification_type: 'rejected',
-        p_notifier_user_id: currentUser.id
-      }).catch((err: any) => {
-        console.log('Notification sent to sender');
-      });
+      // 📧 Send notification email to sender (don't block on this)
+      try {
+        await supabase.rpc('send_status_notification_email', {
+          p_proforma_id: proforma.id,
+          p_notification_type: 'rejected',
+          p_notifier_user_id: currentUser.id
+        });
+        console.log('Rejection notification sent to sender');
+      } catch (emailErr) {
+        console.log('Could not send email notification:', emailErr);
+      }
       
       toast.success(t('proforma.reject_quotation'));
       toast.info(`❌ Sender has been notified that you rejected proforma #${proforma.number}`);
