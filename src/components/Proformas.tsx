@@ -260,6 +260,35 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
+  // Load proforma items when opening preview
+  const loadProformaItems = async (proformaId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('proforma_items')
+        .select('*')
+        .eq('proforma_id', proformaId)
+        .order('created_at');
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error loading proforma items:', error);
+      return [];
+    }
+  };
+
+  const handlePreviewReceivedProforma = async (proforma: any) => {
+    // Load items for this proforma
+    const items = await loadProformaItems(proforma.id);
+    
+    // Set proforma with loaded items
+    setPreviewProforma({
+      ...proforma,
+      proforma_items: items
+    });
+    setShowPreview(true);
+  };
+
   const handleCreateProforma = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -1605,10 +1634,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          setPreviewProforma(proforma);
-                          setShowPreview(true);
-                        }}
+                        onClick={() => handlePreviewReceivedProforma(proforma)}
                         className="gap-1"
                       >
                         <Eye className="h-4 w-4" />
