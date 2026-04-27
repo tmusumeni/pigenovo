@@ -33,6 +33,44 @@ CREATE INDEX IF NOT EXISTS idx_proforma_recipients_proforma ON public.proforma_r
 CREATE INDEX IF NOT EXISTS idx_proforma_recipients_status ON public.proforma_recipients(status);
 
 -- ============================================================================
+-- RLS POLICIES FOR PROFORMA_RECIPIENTS TABLE
+-- ============================================================================
+
+-- Enable RLS on proforma_recipients
+ALTER TABLE public.proforma_recipients ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to view their received proformas (as receiver)
+CREATE POLICY "Users can view their received proformas"
+  ON public.proforma_recipients
+  FOR SELECT
+  USING (auth.uid() = receiver_user_id);
+
+-- Allow senders to view who they sent proformas to (for tracking)
+CREATE POLICY "Senders can view their sent proformas recipients"
+  ON public.proforma_recipients
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.proformas
+      WHERE proformas.id = proforma_recipients.proforma_id
+      AND proformas.user_id = auth.uid()
+    )
+  );
+
+-- Allow RPC functions to insert (with SECURITY DEFINER, this won't be used but kept for clarity)
+CREATE POLICY "RPC functions can insert recipients"
+  ON public.proforma_recipients
+  FOR INSERT
+  WITH CHECK (true);
+
+-- Allow RPC functions to update (with SECURITY DEFINER)
+CREATE POLICY "RPC functions can update recipients"
+  ON public.proforma_recipients
+  FOR UPDATE
+  USING (true)
+  WITH CHECK (true);
+
+-- ============================================================================
 -- RPC FUNCTION: Send proforma to receiver (NEW VERSION)
 -- ============================================================================
 
