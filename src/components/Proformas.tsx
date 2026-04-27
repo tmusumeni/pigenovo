@@ -256,10 +256,49 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Check if draft proforma with this number already exists (prevent duplicates)
+      const { data: existingDraft } = await supabase
+        .from('proformas')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('number', formData.number)
+        .eq('status', 'draft')
+        .maybeSingle();
+
+      if (existingDraft) {
+        // Update existing draft instead of creating new one
+        const totals = calculateTotalWithTaxAndDiscount();
+        
+        const { error: updateError } = await supabase
+          .from('proformas')
+          .update({
+            client_name: formData.client_name,
+            client_phone: formData.client_phone,
+            client_email: formData.client_email,
+            amount: totals.subtotal,
+            currency: formData.currency,
+            description: formData.description,
+            valid_until: formData.valid_until || null,
+            tax_rate: formData.tax_rate || 0,
+            discount_rate: formData.discount_rate || 0,
+            tax_amount: totals.taxAmount,
+            discount_amount: totals.discountAmount,
+            total_amount: totals.total
+          })
+          .eq('id', existingDraft.id);
+
+        if (updateError) throw updateError;
+        
+        toast.success(`✅ ${formData.number} updated successfully`);
+        await fetchProformas();
+        resetForm();
+        return;
+      }
+
       // Calculate total with tax and discount
       const totals = calculateTotalWithTaxAndDiscount();
 
-      // Create proforma - temporarily without tax/discount fields until migrations run
+      // Create new proforma
       const { data: proformaData, error: proformaError } = await supabase
         .from('proformas')
         .insert([{
