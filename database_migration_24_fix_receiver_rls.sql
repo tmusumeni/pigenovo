@@ -27,16 +27,38 @@ CREATE POLICY "Users can view their received proformas"
   FOR SELECT
   USING (auth.uid() = receiver_user_id);
 
--- Allow RPC functions to insert/update (with SECURITY DEFINER)
--- Senders don't need to query proforma_recipients directly; RPC functions handle this
+-- Allow senders to view who they sent proformas to (for tracking)
+CREATE POLICY "Senders can view their sent proformas recipients"
+  ON public.proforma_recipients
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.proformas
+      WHERE proformas.id = proforma_recipients.proforma_id
+      AND proformas.user_id = auth.uid()
+    )
+  );
+
+-- Allow RPC functions to insert (with SECURITY DEFINER, this won't be used but kept for clarity)
+CREATE POLICY "RPC functions can insert recipients"
+  ON public.proforma_recipients
+  FOR INSERT
+  WITH CHECK (true);
+
+-- Allow RPC functions to update (with SECURITY DEFINER)
+CREATE POLICY "RPC functions can update recipients"
+  ON public.proforma_recipients
+  FOR UPDATE
+  USING (true)
+  WITH CHECK (true);
 
 -- ============================================================================
--- RPC FUNCTIONS HANDLE PROFORMA ACCESS FOR RECEIVERS
+-- NOTE: NO ADDITIONAL POLICIES NEEDED FOR PROFORMAS/ITEMS
 -- ============================================================================
--- No additional RLS policies needed on proformas or proforma_items tables
--- because the RPC functions (get_received_proformas, recipient_accept_proforma,
--- recipient_reject_proforma) have SECURITY DEFINER and bypass RLS.
--- These functions handle all authorization logic internally.
+-- The SECURITY DEFINER RPC functions (get_received_proformas, etc.)
+-- bypass RLS and handle access control internally.
+-- Adding policies here creates circular references and infinite recursion.
+-- The existing RLS policies (users see only their own) are sufficient.
 
 -- ============================================================================
 -- VERIFY FUNCTIONS EXIST AND HAVE CORRECT PERMISSIONS
@@ -54,20 +76,28 @@ GRANT EXECUTE ON FUNCTION public.get_received_proformas(uuid) TO authenticated;
 /*
   This migration fixes the "0 received proformas" issue by:
   
-  1. Enabling RLS on proforma_recipients table
-  2. Adding single policy: Receivers can see their received proformas
-     - Only receivers listed in proforma_recipients.receiver_user_id can see their rows
+  1. Adding RLS policies to proforma_recipients table
+     - Receivers can see their received proformas
+     - Senders can see who they sent to
+     - RPC functions can insert/update
   
-  3. RPC functions handle all proformas/proforma_items access
-     - get_received_proformas() has SECURITY DEFINER (bypasses RLS)
-     - recipient_accept_proforma() has SECURITY DEFINER
-     - recipient_reject_proforma() has SECURITY DEFINER
-     - These functions authorize users internally
+  2. RPC Functions Handle Everything Else
+     - get_received_proformas() uses SECURITY DEFINER to bypass RLS
+     - Accesses both proformas and proforma_recipients securely
+     - Returns complete sender data to receiver
   
-  This avoids circular RLS policy references.
+  3. Existing RLS on proformas/items still works
+     - Senders see only their own proformas (as before)
+     - No circular reference policies needed
   
   After running this migration:
   - Receivers will see all proformas sent to them in the "Received Proformas" tab
   - The get_received_proformas() RPC function will return results
   - All accept/reject operations will work correctly
+  - No infinite recursion errors
+  
+  Why no RLS policies on proformas for receivers?
+  - Direct RLS policies would create circular references with proforma_recipients
+  - The SECURITY DEFINER RPC functions handle this safely
+  - This is the correct Supabase pattern for this use case
 */

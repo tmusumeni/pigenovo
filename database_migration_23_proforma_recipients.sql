@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_proforma_recipients_proforma ON public.proforma_r
 CREATE INDEX IF NOT EXISTS idx_proforma_recipients_status ON public.proforma_recipients(status);
 
 -- ============================================================================
--- RLS POLICIES FOR PROFORMA_RECIPIENTS TABLE
+-- RLC POLICIES FOR PROFORMA_RECIPIENTS TABLE
 -- ============================================================================
 
 -- Enable RLS on proforma_recipients
