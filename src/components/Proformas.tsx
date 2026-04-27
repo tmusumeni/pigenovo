@@ -195,6 +195,13 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       
       // Process data with all fields from RPC
       const processedData = (data || []).map((proforma: any) => {
+        const amount = Number(proforma.amount) || 0;
+        const taxRate = Number(proforma.tax_rate) || 0;
+        const discountRate = Number(proforma.discount_rate) || 0;
+        const baseAmount = amount * (1 - discountRate / 100);
+        const taxAmount = baseAmount * (taxRate / 100);
+        const totalAmount = proforma.total_amount || baseAmount + taxAmount;
+        
         return {
           ...proforma,
           // Map fields properly
@@ -204,15 +211,15 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           client_email: proforma.client_email,
           client_phone: proforma.client_phone,
           description: proforma.description,
-          amount: proforma.amount || 0,
+          amount: amount,
           currency: proforma.currency || 'RWF',
           proforma_date: proforma.proforma_date,
           valid_until: proforma.valid_until,
-          tax_rate: proforma.tax_rate || 0,
-          discount_rate: proforma.discount_rate || 0,
-          tax_amount: proforma.tax_amount || 0,
-          discount_amount: proforma.discount_amount || 0,
-          total_amount: proforma.total_amount || proforma.amount || 0,
+          tax_rate: taxRate,
+          discount_rate: discountRate,
+          tax_amount: taxAmount,
+          discount_amount: amount * (discountRate / 100),
+          total_amount: totalAmount,
           status: proforma.status,
           user_id: proforma.user_id,
           sent_date: proforma.sent_date,
