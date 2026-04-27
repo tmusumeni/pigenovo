@@ -20,6 +20,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'nav.invoices': 'Ifakitire',
     'nav.reports': 'Raporo',
     'nav.admin': 'Intenderi',
+    'nav.logout': 'Sohoka',
     
     // Common
     'common.close': 'Funga',
@@ -106,6 +107,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'nav.invoices': 'Ankara',
     'nav.reports': 'Ripoti',
     'nav.admin': 'Msimamizi',
+    'nav.logout': 'Toka',
     
     // Common
     'common.close': 'Funga',
@@ -192,6 +194,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'nav.invoices': 'Invoices',
     'nav.reports': 'Reports',
     'nav.admin': 'Admin',
+    'nav.logout': 'Sign Out',
     
     // Common
     'common.close': 'Close',
@@ -278,6 +281,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'nav.invoices': 'Factures',
     'nav.reports': 'Rapports',
     'nav.admin': 'Admin',
+    'nav.logout': 'Se Déconnecter',
     
     // Common
     'common.close': 'Fermer',

@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/LanguageSelector';
+import { useLanguage } from '@/lib/LanguageContext';
 import { supabase } from '../supabaseClient';
 
 interface SidebarProps {
@@ -27,6 +28,7 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: SidebarProps) {
   const [pendingCount, setPendingCount] = useState(0);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -51,13 +53,13 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
   }, [isAdmin]);
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'trading', label: 'Exchange', icon: TrendingUp },
-    { id: 'watch-earn', label: 'Watch & Earn', icon: PlayCircle },
-    { id: 'wallet', label: 'Wallet', icon: Wallet },
-    { id: 'proformas', label: 'Proformas', icon: ClipboardList },
-    { id: 'invoices', label: 'Invoices', icon: FileText },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
+    { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+    { id: 'trading', label: t('nav.trading'), icon: TrendingUp },
+    { id: 'watch-earn', label: t('nav.watch_earn'), icon: PlayCircle },
+    { id: 'wallet', label: t('nav.wallet'), icon: Wallet },
+    { id: 'proformas', label: t('proforma.title'), icon: ClipboardList },
+    { id: 'invoices', label: t('invoices.title'), icon: FileText },
+    { id: 'reports', label: t('reports.title'), icon: BarChart3 },
     { id: 'ai-assistant', label: 'AI Assistant', icon: MessageSquare },
   ];
 
@@ -99,7 +101,7 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
           >
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-5 w-5" />
-              Admin Panel
+              {t('nav.admin')}
             </div>
             {pendingCount > 0 && (
               <span className="bg-orange-500 text-white text-[10px] h-5 w-5 flex items-center justify-center rounded-full border-2 border-card">
@@ -120,7 +122,7 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
           onClick={onSignOut}
         >
           <LogOut className="h-5 w-5 mr-3" />
-          Sign Out
+          {t('nav.logout')}
         </Button>
       </div>
     </aside>

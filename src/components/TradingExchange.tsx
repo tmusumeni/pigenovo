@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import { 
   XAxis, 
   YAxis, 
@@ -91,6 +92,9 @@ interface Position {
   pnl: number;
   pnl_percent: number;
   type: 'buy' | 'sell';
+  entry_price?: number;
+  stop_loss?: number;
+  take_profit?: number;
 }
 
 interface PricePoint {
@@ -114,6 +118,9 @@ export function TradingExchange({ user }: { user: any }) {
   const [countdown, setCountdown] = useState('');
   const [activeTradeTab, setActiveTradeTab] = useState('positions');
   const [exchangeRates, setExchangeRates] = useState({ usdt_rwf: 1300, pi_rwf: 45000 });
+  const [entryPrice, setEntryPrice] = useState('');
+  const [stopLoss, setStopLoss] = useState('');
+  const [takeProfit, setTakeProfit] = useState('');
 
   // Refs for real-time state access without stale closures
   const selectedAssetRef = React.useRef(selectedAsset);
@@ -291,17 +298,28 @@ export function TradingExchange({ user }: { user: any }) {
       if (error) throw error;
       if (!trades) return;
 
-      // Group by asset to net longs and shorts
+      // Group by asset to net longs and shorts, tracking SL/TP from first entry
       const assetMap: Record<string, { 
         buyQty: number, 
         buyCost: number, 
         sellQty: number, 
-        sellCost: number 
+        sellCost: number,
+        entry_price?: number,
+        stop_loss?: number,
+        take_profit?: number
       }> = {};
       
       trades.forEach(trade => {
         if (!assetMap[trade.asset_id]) {
-          assetMap[trade.asset_id] = { buyQty: 0, buyCost: 0, sellQty: 0, sellCost: 0 };
+          assetMap[trade.asset_id] = { 
+            buyQty: 0, 
+            buyCost: 0, 
+            sellQty: 0, 
+            sellCost: 0,
+            entry_price: trade.entry_price,
+            stop_loss: trade.stop_loss,
+            take_profit: trade.take_profit
+          };
         }
         
         if (trade.type === 'buy') {
@@ -337,7 +355,10 @@ export function TradingExchange({ user }: { user: any }) {
             current_price: asset?.price || avgPrice,
             pnl: 0,
             pnl_percent: 0,
-            type: type
+            type: type,
+            entry_price: data.entry_price,
+            stop_loss: data.stop_loss,
+            take_profit: data.take_profit
           });
         }
       }
@@ -488,7 +509,10 @@ export function TradingExchange({ user }: { user: any }) {
         amount: totalCost,
         asset_quantity: quantity,
         price_at_trade: selectedAsset!.price,
-        fee
+        fee,
+        entry_price: entryPrice ? Number(entryPrice) : selectedAsset!.price,
+        stop_loss: stopLoss ? Number(stopLoss) : null,
+        take_profit: takeProfit ? Number(takeProfit) : null
       });
 
       if (tradeError) throw tradeError;
@@ -506,6 +530,9 @@ export function TradingExchange({ user }: { user: any }) {
       toast.dismiss();
       toast.success(`${type === 'buy' ? 'LONG' : 'SHORT'} order placed! Balance deducted.`);
       setAmount('');
+      setEntryPrice('');
+      setStopLoss('');
+      setTakeProfit('');
     } catch (error: any) {
       toast.dismiss();
       toast.error(error.message);
@@ -744,6 +771,50 @@ export function TradingExchange({ user }: { user: any }) {
                     </motion.div>
                   )}
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Entry Price</Label>
+                  <div className="relative">
+                    <Input 
+                      type="number" 
+                      placeholder={selectedAsset?.price.toFixed(2) || "0.00"}
+                      value={entryPrice}
+                      onChange={(e) => setEntryPrice(e.target.value)}
+                      className="pr-12"
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-bold">RWF</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Stop Loss</Label>
+                    <div className="relative">
+                      <Input 
+                        type="number" 
+                        placeholder="0.00"
+                        value={stopLoss}
+                        onChange={(e) => setStopLoss(e.target.value)}
+                        className="pr-6"
+                      />
+                      <span className="absolute right-2 top-2.5 text-[10px] text-muted-foreground font-bold">SL</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Take Profit</Label>
+                    <div className="relative">
+                      <Input 
+                        type="number" 
+                        placeholder="0.00"
+                        value={takeProfit}
+                        onChange={(e) => setTakeProfit(e.target.value)}
+                        className="pr-6"
+                      />
+                      <span className="absolute right-2 top-2.5 text-[10px] text-muted-foreground font-bold">TP</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
                   {[25, 50, 75, 100].map(p => (
                     <Button 
@@ -818,6 +889,8 @@ export function TradingExchange({ user }: { user: any }) {
                             <th className="text-right pb-3 font-medium">Quantity</th>
                             <th className="text-right pb-3 font-medium">Avg. Price</th>
                             <th className="text-right pb-3 font-medium">Current</th>
+                            <th className="text-right pb-3 font-medium text-orange-500 text-xs">SL</th>
+                            <th className="text-right pb-3 font-medium text-green-500 text-xs">TP</th>
                             <th className="text-right pb-3 font-medium">PnL (RWF)</th>
                             <th className="text-right pb-3 font-medium">Action</th>
                           </tr>
@@ -837,6 +910,28 @@ export function TradingExchange({ user }: { user: any }) {
                               <td className="py-4 text-right font-mono">{pos.quantity.toFixed(4)}</td>
                               <td className="py-4 text-right font-mono">{pos.avg_price.toFixed(2)}</td>
                               <td className="py-4 text-right font-mono">{pos.current_price.toFixed(2)}</td>
+                              <td className="py-4 text-right font-mono">
+                                {pos.stop_loss ? (
+                                  <span className={cn(
+                                    pos.type === 'buy' && pos.current_price <= pos.stop_loss ? 'text-orange-500 font-bold' : pos.type === 'sell' && pos.current_price >= pos.stop_loss ? 'text-orange-500 font-bold' : ''
+                                  )}>
+                                    {pos.stop_loss.toFixed(2)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">—</span>
+                                )}
+                              </td>
+                              <td className="py-4 text-right font-mono">
+                                {pos.take_profit ? (
+                                  <span className={cn(
+                                    pos.type === 'buy' && pos.current_price >= pos.take_profit ? 'text-green-500 font-bold' : pos.type === 'sell' && pos.current_price <= pos.take_profit ? 'text-green-500 font-bold' : ''
+                                  )}>
+                                    {pos.take_profit.toFixed(2)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">—</span>
+                                )}
+                              </td>
                               <td className={cn(
                                 "py-4 text-right font-mono font-bold",
                                 pos.pnl >= 0 ? "text-green-500" : "text-red-500"
