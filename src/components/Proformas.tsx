@@ -9,6 +9,9 @@ import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import { Plus, Download, Send, CheckCircle, XCircle, ArrowRight, Trash2, Eye, Edit2, FileDown, Image as ImageIcon, Inbox } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomerSelector } from '@/components/CustomerSelector';
+import { CustomerModal } from '@/components/CustomerModal';
+import { type Customer } from '@/lib/customerService';
 
 interface Proforma {
   id: string;
@@ -61,6 +64,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [exportPendingProforma, setExportPendingProforma] = useState<ProformaWithItems | null>(null);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'image'>('pdf');
   const [lastNotifiedIds, setLastNotifiedIds] = useState<Set<string>>(new Set());
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -1099,55 +1104,69 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateProforma} className="space-y-4">
-                {/* Client Info Section */}
+                {/* Customer Selector */}
                 <div className="border-b pb-4">
-                  <h3 className="font-bold mb-4">Client Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>{t('proforma.number')}</Label>
-                      <div className="p-2 border rounded bg-muted text-sm font-mono font-bold text-primary">
-                        {formData.number || 'Generating...'}
+                  <CustomerSelector
+                    onSelectCustomer={(customer) => {
+                      setSelectedCustomer(customer);
+                      setFormData(prev => ({
+                        ...prev,
+                        client_name: customer.full_name,
+                        client_phone: customer.phone_number || '',
+                        client_email: customer.email || ''
+                      }));
+                    }}
+                    onCreateNew={() => setShowCustomerModal(true)}
+                    placeholder="Search customers by name, phone, or company..."
+                  />
+                </div>
+
+                {/* Additional Client Info */}
+                {selectedCustomer && (
+                  <div className="border-b pb-4">
+                    <h3 className="font-bold mb-3 text-sm text-muted-foreground">Proforma Settings</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>{t('proforma.number')}</Label>
+                        <div className="p-2 border rounded bg-muted text-sm font-mono font-bold text-primary">
+                          {formData.number || 'Generating...'}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">🔄 Auto-generated</p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">🔄 Auto-generated</p>
+                      <div>
+                        <Label>Currency</Label>
+                        <select
+                          value={formData.currency}
+                          onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                          className="w-full p-2 border rounded"
+                        >
+                          <option value="RWF">RWF</option>
+                          <option value="USDT">USDT</option>
+                          <option value="PI">PI</option>
+                        </select>
+                      </div>
                     </div>
-                    <div>
-                      <Label>{t('invoices.client_name')}</Label>
-                      <Input
-                        value={formData.client_name}
-                        onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
-                        placeholder={t('invoices.client_name')}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label>{t('invoices.client_phone')}</Label>
-                      <Input
-                        value={formData.client_phone}
-                        onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
-                        placeholder="+250..."
-                      />
-                    </div>
-                    <div>
-                      <Label>{t('invoices.client_email')}</Label>
-                      <Input
-                        type="email"
-                        value={formData.client_email}
-                        onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
-                        placeholder="client@example.com"
-                      />
-                    </div>
-                    <div>
-                      <Label>Currency</Label>
-                      <select
-                        value={formData.currency}
-                        onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                        className="w-full p-2 border rounded"
-                      >
-                        <option value="RWF">RWF</option>
-                        <option value="USDT">USDT</option>
-                        <option value="PI">PI</option>
-                      </select>
-                    </div>
+                  </div>
+                )}
+
+                {/* Client Info Section - Hidden inputs for backward compatibility */}
+                <div className="hidden">
+                  <Input
+                    value={formData.client_name}
+                    onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                    placeholder={t('invoices.client_name')}
+                  />
+                  <Input
+                    value={formData.client_phone}
+                    onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
+                    placeholder="+250..."
+                  />
+                  <Input
+                    value={formData.client_email}
+                    onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
+                    placeholder="client@example.com"
+                  />
+                </div>
                     <div>
                       <Label>{t('proforma.valid_until')}</Label>
                       <Input
@@ -2222,6 +2241,21 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           <p>✅ <strong>Step 5:</strong> Client pays via platform → Money added to your wallet automatically</p>
         </CardContent>
       </Card>
+
+      {/* Customer Modal */}
+      <CustomerModal
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        onCustomerSaved={(customer) => {
+          setSelectedCustomer(customer);
+          setFormData(prev => ({
+            ...prev,
+            client_name: customer.full_name,
+            client_phone: customer.phone_number || '',
+            client_email: customer.email || ''
+          }));
+        }}
+      />
     </div>
   );
 }
