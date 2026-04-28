@@ -19,6 +19,7 @@ WHERE method IS NULL
      'wallet_payment',
      'invoice_payment',
      'export_fee',
+     'send_fee',
      'service_charge',
      'withdrawal',
      'deposit',
@@ -37,6 +38,7 @@ CHECK (method IN (
   'wallet_payment',         -- Payment from one wallet to another
   'invoice_payment',        -- Payment for invoice converted from proforma
   'export_fee',             -- Fee for exporting proforma/invoice
+  'send_fee',               -- Fee for sending proforma to recipient
   'service_charge',         -- General service charges
   'withdrawal',             -- General withdrawal
   'deposit',                -- General deposit
