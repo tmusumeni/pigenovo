@@ -776,23 +776,55 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
   const fetchExportCharge = async () => {
     try {
-      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
-      if (data) {
-        setExportCharge(data.value.charge || 1000);
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'proforma_export_charge')
+        .single();
+
+      if (error) {
+        console.log('Export charge not found, initializing with default 1000');
+        const { error: insertError } = await supabase
+          .from('settings')
+          .insert({
+            id: 'proforma_export_charge',
+            value: { charge: 1000 }
+          });
+        if (insertError) console.error('Error initializing export charge:', insertError);
+        setExportCharge(1000);
+      } else if (data) {
+        setExportCharge(data.value?.charge || 1000);
       }
     } catch (error) {
-      setExportCharge(1000); // Default charge
+      console.error('Error fetching export charge:', error);
+      setExportCharge(1000);
     }
   };
 
   const fetchSendCharge = async () => {
     try {
-      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_send_charge').single();
-      if (data) {
-        setSendCharge(data.value.charge || 500);
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'proforma_send_charge')
+        .single();
+
+      if (error) {
+        console.log('Send charge not found, initializing with default 500');
+        const { error: insertError } = await supabase
+          .from('settings')
+          .insert({
+            id: 'proforma_send_charge',
+            value: { charge: 500 }
+          });
+        if (insertError) console.error('Error initializing send charge:', insertError);
+        setSendCharge(500);
+      } else if (data) {
+        setSendCharge(data.value?.charge || 500);
       }
     } catch (error) {
-      setSendCharge(500); // Default charge
+      console.error('Error fetching send charge:', error);
+      setSendCharge(500);
     }
   };
 
