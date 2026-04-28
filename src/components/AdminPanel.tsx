@@ -82,6 +82,7 @@ export function AdminPanel() {
   const [platformWallet, setPlatformWallet] = useState<any>(null);
   const [platformEarnings, setPlatformEarnings] = useState<any[]>([]);
   const [earningsSummary, setEarningsSummary] = useState<any>(null);
+  const [platformCharges, setPlatformCharges] = useState({ export_fee: 0, send_fee: 0, total: 0 });
   
   const [loading, setLoading] = useState(false);
 
@@ -388,6 +389,29 @@ export function AdminPanel() {
         setPlatformWallet(initData);
       } else {
         setPlatformWallet(data);
+      }
+      
+      // Fetch platform charges (export and send fees)
+      const { data: chargesData, error: chargesError } = await supabase
+        .from('wallet_transactions')
+        .select('method, amount')
+        .in('method', ['export_fee', 'send_fee'])
+        .eq('status', 'approved');
+      
+      if (!chargesError && chargesData) {
+        const exportFees = chargesData
+          .filter(tx => tx.method === 'export_fee')
+          .reduce((sum, tx) => sum + Number(tx.amount), 0);
+        
+        const sendFees = chargesData
+          .filter(tx => tx.method === 'send_fee')
+          .reduce((sum, tx) => sum + Number(tx.amount), 0);
+        
+        setPlatformCharges({
+          export_fee: exportFees,
+          send_fee: sendFees,
+          total: exportFees + sendFees
+        });
       }
     } catch (error) {
       console.error('Error in fetchPlatformWallet:', error);
@@ -1953,6 +1977,51 @@ export function AdminPanel() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">From user trading losses</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">📤 Export Charges</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">
+                  {platformCharges.export_fee.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })} RWF
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">From proforma exports</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">📧 Send Charges</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600">
+                  {platformCharges.send_fee.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })} RWF
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">From proforma sends</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">💳 Platform Charges Total</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">
+                  {platformCharges.total.toLocaleString('en-US', { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  })} RWF
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">Export + Send fees</p>
               </CardContent>
             </Card>
           </div>
