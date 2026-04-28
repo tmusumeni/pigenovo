@@ -2133,6 +2133,33 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <Button variant="ghost" onClick={() => setShowPreview(false)}>✕</Button>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Sender Profile Section */}
+              {userProfile && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-3">📤 FROM (Sender Information)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Name</p>
+                      <p className="font-semibold text-sm">{userProfile.full_name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="font-semibold text-sm">{userProfile.email || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Phone</p>
+                      <p className="font-semibold text-sm">{userProfile.phone_number || 'N/A'}</p>
+                    </div>
+                    {userProfile.tin_number && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">TIN</p>
+                        <p className="font-semibold text-sm">{userProfile.tin_number}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 pb-4 border-b">
                 <div>
                   <p className="text-xs text-muted-foreground">Client</p>
