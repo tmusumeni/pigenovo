@@ -72,6 +72,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [senderProfiles, setSenderProfiles] = useState<Record<string, any>>({});
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -150,6 +151,33 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       return `PRO-${String(nextNum).padStart(3, '0')}`;
     } catch (error) {
       return 'PRO-001';
+    }
+  };
+
+  const fetchSenderProfile = async (userId: string) => {
+    try {
+      // Check cache first
+      if (senderProfiles[userId]) {
+        return senderProfiles[userId];
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching sender profile:', error);
+        return null;
+      }
+
+      // Cache the profile
+      setSenderProfiles(prev => ({ ...prev, [userId]: profile }));
+      return profile;
+    } catch (error) {
+      console.error('Error fetching sender profile:', error);
+      return null;
     }
   };
 
@@ -255,6 +283,14 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       });
       
       console.log('Processed data:', processedData);
+      
+      // Fetch sender profiles for all proformas
+      const uniqueSenderIds = [...new Set(processedData.map((p: ProformaWithItems) => p.user_id).filter(Boolean))];
+      for (const senderId of uniqueSenderIds) {
+        if (senderId && !senderProfiles[senderId]) {
+          await fetchSenderProfile(senderId);
+        }
+      }
       
       // ✨ DETECT AND NOTIFY ABOUT NEW PROFORMAS
       const newProformaIds = processedData
@@ -1859,111 +1895,130 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                             <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
                           )}
                         </div>
-                        <p className="text-sm font-semibold text-blue-700">From: {proforma.client_name}</p>
-                        {proforma.client_phone && <p className="text-xs text-muted-foreground">{proforma.client_phone}</p>}
-                        {proforma.sent_date && <p className="text-xs text-muted-foreground">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
-                      </div>
-                      <div className="flex items-end flex-col gap-2">
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Amount</p>
-                          <p className="text-lg font-bold text-blue-600">
-                            {(proforma.total_amount || proforma.amount).toLocaleString()} {proforma.currency}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    {proforma.description && (
-                      <p className="text-sm text-muted-foreground mb-3 italic">{proforma.description}</p>
-                    )}
-
-                    {/* Items Summary - UNIQUE ONLY */}
-                    <div className="mb-3 text-sm bg-white p-2 rounded">
-                      <p className="font-semibold mb-1">Items:</p>
-                      {getUniqueItems(proforma.proforma_items).map((item: ProformaItem, idx: number) => (
-                        <div key={idx} className="flex justify-between text-xs">
-                          <span>{item.description} × {item.quantity}</span>
-                          <span>{(item.quantity * item.unit_price).toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Tax/Discount Info */}
-                    {(proforma.tax_rate || proforma.discount_rate) && (
-                      <div className="mb-3 text-xs space-y-1 font-semibold">
-                        {proforma.discount_rate > 0 && (
-                          <div className="text-orange-600">Discount: -{(proforma.discount_amount || 0).toLocaleString()} ({proforma.discount_rate}%)</div>
-                        )}
-                        {proforma.tax_rate > 0 && (
-                          <div className="text-blue-600">Tax: +{(proforma.tax_amount || 0).toLocaleString()} ({proforma.tax_rate}%)</div>
+                      
+                      {/* Sender Profile Section */}
+                      <div className="bg-white p-3 rounded-md mb-3 border border-blue-100">
+                        <p className="text-xs font-semibold text-gray-600 mb-2">📨 FROM SENDER:</p>
+                        <p className="text-sm font-bold text-blue-700">{proforma.client_name}</p>
+                        {senderProfiles[proforma.user_id] && (
+                          <>
+                            {senderProfiles[proforma.user_id].phone_number && (
+                              <p className="text-xs text-muted-foreground">📱 {senderProfiles[proforma.user_id].phone_number}</p>
+                            )}
+                            {senderProfiles[proforma.user_id].email && (
+                              <p className="text-xs text-muted-foreground">✉️ {senderProfiles[proforma.user_id].email}</p>
+                            )}
+                            {senderProfiles[proforma.user_id].tin_number && (
+                              <p className="text-xs font-semibold text-green-700 mt-1">🏛️ TIN: {senderProfiles[proforma.user_id].tin_number}</p>
+                            )}
+                          </>
                         )}
                       </div>
-                    )}
+                      
+                      {proforma.client_phone && <p className="text-xs text-muted-foreground">{proforma.client_phone}</p>}
+                      {proforma.sent_date && <p className="text-xs text-muted-foreground">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
+                    </div>
+                    <div className="flex items-end flex-col gap-2">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Amount</p>
+                        <p className="text-lg font-bold text-blue-600">
+                          {(proforma.total_amount || proforma.amount).toLocaleString()} {proforma.currency}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handlePreviewReceivedProforma(proforma)}
-                        className="gap-1"
-                      >
-                        <Eye className="h-4 w-4" />
-                        Preview
-                      </Button>
+                  {/* Description */}
+                  {proforma.description && (
+                    <p className="text-sm text-muted-foreground mb-3 italic">{proforma.description}</p>
+                  )}
 
-                      {proforma.status === 'sent' && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => handleAcceptProforma(proforma)}
-                            disabled={loading}
-                            className="gap-1 bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="h-3 w-3" />
-                            Accept
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRejectProforma(proforma)}
-                            disabled={loading}
-                            className="gap-1 text-red-600 hover:text-red-700"
-                          >
-                            <XCircle className="h-3 w-3" />
-                            Reject
-                          </Button>
-                        </>
+                  {/* Items Summary - UNIQUE ONLY */}
+                  <div className="mb-3 text-sm bg-white p-2 rounded">
+                    <p className="font-semibold mb-1">Items:</p>
+                    {getUniqueItems(proforma.proforma_items).map((item: ProformaItem, idx: number) => (
+                      <div key={idx} className="flex justify-between text-xs">
+                        <span>{item.description} × {item.quantity}</span>
+                        <span>{(item.quantity * item.unit_price).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tax/Discount Info */}
+                  {(proforma.tax_rate || proforma.discount_rate) && (
+                    <div className="mb-3 text-xs space-y-1 font-semibold">
+                      {proforma.discount_rate > 0 && (
+                        <div className="text-orange-600">Discount: -{(proforma.discount_amount || 0).toLocaleString()} ({proforma.discount_rate}%)</div>
                       )}
+                      {proforma.tax_rate > 0 && (
+                        <div className="text-blue-600">Tax: +{(proforma.tax_amount || 0).toLocaleString()} ({proforma.tax_rate}%)</div>
+                      )}
+                    </div>
+                  )}
 
-                      {proforma.status === 'accepted' && (
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePreviewReceivedProforma(proforma)}
+                      className="gap-1"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Preview
+                    </Button>
+
+                    {proforma.status === 'sent' && (
+                      <>
                         <Button
                           size="sm"
-                          onClick={() => handleConvertToInvoice(proforma)}
+                          onClick={() => handleAcceptProforma(proforma)}
                           disabled={loading}
                           className="gap-1 bg-green-600 hover:bg-green-700"
                         >
-                          <ArrowRight className="h-3 w-3" />
-                          Convert to Invoice
+                          <CheckCircle className="h-3 w-3" />
+                          Accept
                         </Button>
-                      )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRejectProforma(proforma)}
+                          disabled={loading}
+                          className="gap-1 text-red-600 hover:text-red-700"
+                        >
+                          <XCircle className="h-3 w-3" />
+                          Reject
+                        </Button>
+                      </>
+                    )}
 
-                      {proforma.status === 'converted' && (
-                        <div className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-700 font-semibold">
-                          ✅ Converted to Invoice
-                        </div>
-                      )}
+                    {proforma.status === 'accepted' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleConvertToInvoice(proforma)}
+                        disabled={loading}
+                        className="gap-1 bg-green-600 hover:bg-green-700"
+                      >
+                        <ArrowRight className="h-3 w-3" />
+                        Convert to Invoice
+                      </Button>
+                    )}
 
-                      {(proforma.status === 'rejected' || proforma.status === 'draft') && (
-                        <div className="text-xs px-2 py-1 rounded bg-gray-500/10 text-gray-700 font-semibold">
-                          {proforma.status.toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
-              )}
+                    {proforma.status === 'converted' && (
+                      <div className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-700 font-semibold">
+                        ✅ Converted to Invoice
+                      </div>
+                    )}
+
+                    {(proforma.status === 'rejected' || proforma.status === 'draft') && (
+                      <div className="text-xs px-2 py-1 rounded bg-gray-500/10 text-gray-700 font-semibold">
+                        {proforma.status.toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))
+            )}
             </TabsContent>
           </Tabs>
         </CardContent>
