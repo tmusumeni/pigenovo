@@ -71,7 +71,7 @@ export function AIAssistant({ user }: { user: any }) {
           { role: 'user', parts: [{ text: userMessage }] }
         ],
         config: {
-          systemInstruction: "You are the PiGenovo 2.0 AI Assistant. Your goal is to provide expert advice on business, news trends, and trading. You are professional, insightful, and helpful. Keep responses concise and actionable."
+          systemInstruction: "You are the PiGenovo AI Assistant. Your goal is to provide expert advice on business, news trends, and trading. You are professional, insightful, and helpful. Keep responses concise and actionable."
         }
       });
 

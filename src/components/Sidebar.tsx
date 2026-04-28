@@ -75,7 +75,7 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut, onMenuCli
             className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-lg"
           />
         </div>
-        <span className="font-bold text-lg md:text-xl tracking-tighter truncate">PiGenovo 2.0</span>
+        <span className="font-bold text-lg md:text-xl tracking-tighter truncate">PiGenovo</span>
       </div>
 
       <nav className="flex-1 px-2 md:px-4 py-4 space-y-1 overflow-y-auto">
