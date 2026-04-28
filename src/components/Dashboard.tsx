@@ -152,7 +152,7 @@ export function Dashboard({ user }: { user: any }) {
                 alt="PiGenovo Logo" 
                 className="h-8 w-8 object-contain rounded"
               />
-              <span className="font-bold text-lg truncate">PiGenovo 2.0</span>
+              <span className="font-bold text-lg truncate">PiGenovo</span>
             </div>
           </div>
 
