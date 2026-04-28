@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Bell, Search, User, Menu, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import logoImage from '@/assets/images/logo.png';
 
 export function Dashboard({ user }: { user: any }) {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -147,7 +148,7 @@ export function Dashboard({ user }: { user: any }) {
             </Button>
             <div className="flex items-center gap-2">
               <img 
-                src="/logo.png" 
+                src={logoImage} 
                 alt="PiGenovo Logo" 
                 className="h-8 w-8 object-contain rounded"
               />

@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { useLanguage } from '@/lib/LanguageContext';
 import { supabase } from '../supabaseClient';
+import logoImage from '@/assets/images/logo.png';
 
 interface SidebarProps {
   activeTab: string;
@@ -69,7 +70,7 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut, onMenuCli
       <div className="p-4 md:p-6 flex items-center gap-3 border-b">
         <div className="flex-shrink-0">
           <img 
-            src="/logo.png" 
+            src={logoImage} 
             alt="PiGenovo Logo" 
             className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-lg"
           />
