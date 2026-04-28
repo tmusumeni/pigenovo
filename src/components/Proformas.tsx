@@ -1143,7 +1143,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               flex: 1;
             }
             .logo-section img {
-              max-width: 120px;
+              max-width: 400px;
               height: auto;
             }
             .qr-section {
