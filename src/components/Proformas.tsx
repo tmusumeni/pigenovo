@@ -1140,6 +1140,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         <div class="sender-info">
           <div class="sender-label">From:</div>
           <p class="sender-name">${userProfile.full_name || 'N/A'}</p>
+          ${userProfile.company_name ? `<p class="sender-company"><strong>Company:</strong> ${userProfile.company_name}</p>` : ''}
           ${userProfile.phone_number ? `<p class="sender-phone">📱 ${userProfile.phone_number}</p>` : ''}
           ${userProfile.email ? `<p class="sender-email">✉️ ${userProfile.email}</p>` : ''}
           ${userProfile.tin_number ? `<p class="sender-tin"><strong>TIN:</strong> ${userProfile.tin_number}</p>` : ''}
@@ -1210,7 +1211,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               font-size: 13px;
               margin-bottom: 3px;
             }
-            .sender-phone, .sender-email, .sender-tin {
+            .sender-company, .sender-phone, .sender-email, .sender-tin {
               margin: 2px 0;
               font-size: 11px;
             }
@@ -2146,6 +2147,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       <p className="text-xs text-muted-foreground">Email</p>
                       <p className="font-semibold text-sm">{userProfile.email || 'N/A'}</p>
                     </div>
+                    {userProfile.company_name && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Company</p>
+                        <p className="font-semibold text-sm">{userProfile.company_name}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-xs text-muted-foreground">Phone</p>
                       <p className="font-semibold text-sm">{userProfile.phone_number || 'N/A'}</p>
