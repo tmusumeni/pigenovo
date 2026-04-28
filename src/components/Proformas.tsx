@@ -71,6 +71,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [lastNotifiedIds, setLastNotifiedIds] = useState<Set<string>>(new Set());
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -97,6 +98,19 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
+      
+      // Fetch user profile with TIN
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (profile) {
+          setUserProfile(profile);
+        }
+      }
+      
       fetchProformas();
       fetchReceivedProformas();
       fetchExportCharge();
@@ -944,14 +958,14 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
-  const handleSaveAfterExport = (action: 'preview' | 'download') => {
+  const handleSaveAfterExport = async (action: 'preview' | 'download') => {
     if (!exportPendingProforma) return;
     
     if (action === 'preview') {
       setPreviewProforma(exportPendingProforma);
       setShowPreview(true);
     } else {
-      generateProformaDocument(exportPendingProforma, exportFormat);
+      await generateProformaDocument(exportPendingProforma, exportFormat);
       toast.success(`✅ Proforma exported as ${exportFormat.toUpperCase()}`);
     }
     
@@ -976,106 +990,315 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setShowNew(false);
   };
 
-  const generateProformaDocument = (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
-    // Generate HTML content
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-          .title { font-size: 24px; font-weight: bold; }
-          .subtitle { font-size: 14px; color: #666; }
-          .section { margin-bottom: 20px; }
-          .label { font-weight: bold; margin-top: 10px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th { background: #f0f0f0; padding: 8px; text-align: left; border: 1px solid #ddd; }
-          td { padding: 8px; border: 1px solid #ddd; }
-          .total { font-weight: bold; background: #f9f9f9; }
-          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">PROFORMA INVOICE</div>
-          <div class="subtitle">Reference: ${proforma.number}</div>
-        </div>
-        
-        <div class="section">
-          <div class="label">Client Information:</div>
-          <p>Name: ${proforma.client_name}</p>
-          ${proforma.client_phone ? `<p>Phone: ${proforma.client_phone}</p>` : ''}
-          ${proforma.client_email ? `<p>Email: ${proforma.client_email}</p>` : ''}
-        </div>
-        
-        <div class="section">
-          <div class="label">Details:</div>
-          <p>Date: ${new Date(proforma.proforma_date).toLocaleDateString()}</p>
-          ${proforma.valid_until ? `<p>Valid Until: ${new Date(proforma.valid_until).toLocaleDateString()}</p>` : ''}
-          ${proforma.description ? `<p>Description: ${proforma.description}</p>` : ''}
-        </div>
-        
-        <div class="section">
-          <div class="label">Line Items (Unique):</div>
-          <table>
-            <tr>
-              <th>Description</th>
-              <th>Quantity</th>
-              <th>Unit Price</th>
-              <th>Total Price</th>
-            </tr>
-            ${getUniqueItems(proforma.proforma_items)?.map(item => `
-              <tr>
-                <td>${item.description}</td>
-                <td align="right">${item.quantity}</td>
-                <td align="right">${item.unit_price.toLocaleString()}</td>
-                <td align="right">${(item.quantity * item.unit_price).toLocaleString()}</td>
-              </tr>
-            `).join('')}
-            <tr class="total">
-              <td colspan="3" align="right">SUBTOTAL:</td>
-              <td align="right">${proforma.amount.toLocaleString()} ${proforma.currency}</td>
-            </tr>
-            <tr>
-              <td colspan="3" align="right">Discount ${proforma.discount_rate && proforma.discount_rate > 0 ? `(${proforma.discount_rate}%)` : '(0%)'}:</td>
-              <td align="right" style="color: #FF9800;">-${(proforma.discount_amount || 0).toLocaleString()} ${proforma.currency}</td>
-            </tr>
-            <tr>
-              <td colspan="3" align="right">Tax ${proforma.tax_rate && proforma.tax_rate > 0 ? `(${proforma.tax_rate}%)` : '(0%)'}:</td>
-              <td align="right" style="color: #2196F3;">+${(proforma.tax_amount || 0).toLocaleString()} ${proforma.currency}</td>
-            </tr>
-            <tr class="total" style="background: #E8F5E9; font-size: 14px;">
-              <td colspan="3" align="right">FINAL TOTAL:</td>
-              <td align="right" style="color: #4CAF50; font-weight: bold;">${(proforma.total_amount || proforma.amount).toLocaleString()} ${proforma.currency}</td>
-            </tr>
-          </table>
-        </div>
-        
-        <div class="footer">
-          <p>This is an automatically generated proforma invoice.</p>
-          <p>Generated on: ${new Date().toLocaleString()}</p>
-        </div>
-      </body>
-      </html>
-    `;
+  const generateProformaDocument = async (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
+    try {
+      // Dynamically import qrcode
+      const QRCode = (await import('qrcode')).default;
+      
+      // Generate QR code for proforma link
+      const proformaUrl = `${window.location.origin}/#/proforma/${proforma.id}`;
+      const qrCodeDataUrl = await QRCode.toDataURL(proformaUrl, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        width: 150,
+        margin: 1,
+      });
 
-    if (format === 'pdf') {
-      // Create PDF using html2canvas + jspdf (fallback: download as HTML)
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Proforma-${proforma.number}.html`;
-      link.click();
-    } else {
-      // For image, we'll use html2canvas if available, otherwise show preview
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Proforma-${proforma.number}.html`;
-      link.click();
+      // Logo URL (from public assets)
+      const logoUrl = '/logo.png'; // Relative path to public/logo.png
+
+      // Build sender profile section
+      const senderSection = userProfile ? `
+        <div class="sender-info">
+          <div class="sender-label">From:</div>
+          <p class="sender-name">${userProfile.full_name || 'N/A'}</p>
+          ${userProfile.phone_number ? `<p class="sender-phone">📱 ${userProfile.phone_number}</p>` : ''}
+          ${userProfile.email ? `<p class="sender-email">✉️ ${userProfile.email}</p>` : ''}
+          ${userProfile.tin_number ? `<p class="sender-tin"><strong>TIN:</strong> ${userProfile.tin_number}</p>` : ''}
+        </div>
+      ` : '';
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            * { margin: 0; padding: 0; }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 20px; 
+              line-height: 1.6;
+              color: #333;
+            }
+            .document-container {
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            .top-bar {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 30px;
+              gap: 20px;
+              padding-bottom: 20px;
+              border-bottom: 2px solid #333;
+            }
+            .logo-section {
+              flex: 1;
+            }
+            .logo-section img {
+              max-width: 120px;
+              height: auto;
+            }
+            .qr-section {
+              flex-shrink: 0;
+              text-align: center;
+            }
+            .qr-section img {
+              width: 140px;
+              height: 140px;
+              border: 1px solid #ccc;
+              padding: 5px;
+            }
+            .qr-label {
+              font-size: 10px;
+              margin-top: 5px;
+              color: #666;
+            }
+            .sender-info {
+              flex: 1;
+              background: #f9f9f9;
+              padding: 15px;
+              border-radius: 5px;
+              font-size: 12px;
+            }
+            .sender-label {
+              font-weight: bold;
+              font-size: 13px;
+              margin-bottom: 8px;
+            }
+            .sender-name {
+              font-weight: bold;
+              font-size: 13px;
+              margin-bottom: 3px;
+            }
+            .sender-phone, .sender-email, .sender-tin {
+              margin: 2px 0;
+              font-size: 11px;
+            }
+            .header-section {
+              margin-bottom: 30px;
+              padding: 20px;
+              background: #f5f5f5;
+              border-radius: 5px;
+            }
+            .title { 
+              font-size: 28px; 
+              font-weight: bold;
+              color: #1a5490;
+              margin-bottom: 5px;
+            }
+            .subtitle { 
+              font-size: 14px; 
+              color: #666;
+            }
+            .two-column {
+              display: flex;
+              gap: 30px;
+              margin-bottom: 30px;
+            }
+            .column {
+              flex: 1;
+            }
+            .section-label {
+              font-weight: bold;
+              font-size: 13px;
+              margin-bottom: 8px;
+              color: #1a5490;
+              border-bottom: 1px solid #1a5490;
+              padding-bottom: 5px;
+            }
+            .section-content {
+              font-size: 12px;
+              line-height: 1.8;
+            }
+            .section-content p {
+              margin: 5px 0;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-top: 10px;
+              font-size: 12px;
+            }
+            th { 
+              background: #1a5490; 
+              color: white;
+              padding: 10px 8px; 
+              text-align: left; 
+              border: 1px solid #ccc; 
+              font-weight: bold;
+            }
+            td { 
+              padding: 8px; 
+              border: 1px solid #ddd; 
+            }
+            tr:nth-child(even) {
+              background: #f9f9f9;
+            }
+            .total-row {
+              font-weight: bold; 
+              background: #e8f5e9;
+              color: #2e7d32;
+            }
+            .summary-section {
+              margin-top: 20px;
+              padding: 15px;
+              background: #e8f5e9;
+              border-left: 4px solid #2e7d32;
+              border-radius: 3px;
+            }
+            .summary-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 8px 0;
+              font-size: 13px;
+            }
+            .summary-row.final {
+              font-size: 16px;
+              font-weight: bold;
+              color: #2e7d32;
+              border-top: 2px solid #2e7d32;
+              padding-top: 8px;
+            }
+            .footer { 
+              margin-top: 40px; 
+              padding-top: 20px; 
+              border-top: 1px solid #ddd; 
+              font-size: 11px; 
+              color: #666;
+              text-align: center;
+            }
+            .footer-note {
+              margin-top: 10px;
+              font-style: italic;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="document-container">
+            <!-- Top Bar with Logo, QR, and Sender -->
+            <div class="top-bar">
+              <div class="logo-section">
+                <img src="${logoUrl}" alt="PiGenovo Logo" />
+              </div>
+              <div class="qr-section">
+                <img src="${qrCodeDataUrl}" alt="QR Code" />
+                <div class="qr-label">Scan to view</div>
+              </div>
+              ${senderSection}
+            </div>
+
+            <!-- Header Section -->
+            <div class="header-section">
+              <div class="title">PROFORMA INVOICE</div>
+              <div class="subtitle">Ref: <strong>${proforma.number}</strong> | Date: ${new Date(proforma.proforma_date).toLocaleDateString()}</div>
+            </div>
+
+            <!-- Bill To and Details -->
+            <div class="two-column">
+              <div class="column">
+                <div class="section-label">Bill To:</div>
+                <div class="section-content">
+                  <p><strong>${proforma.client_name}</strong></p>
+                  ${proforma.client_phone ? `<p>📱 ${proforma.client_phone}</p>` : ''}
+                  ${proforma.client_email ? `<p>✉️ ${proforma.client_email}</p>` : ''}
+                </div>
+              </div>
+              <div class="column">
+                <div class="section-label">Details:</div>
+                <div class="section-content">
+                  <p><strong>Date:</strong> ${new Date(proforma.proforma_date).toLocaleDateString()}</p>
+                  ${proforma.valid_until ? `<p><strong>Valid Until:</strong> ${new Date(proforma.valid_until).toLocaleDateString()}</p>` : ''}
+                  ${proforma.description ? `<p><strong>Description:</strong> ${proforma.description}</p>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- Line Items Table -->
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th style="text-align: right;">Qty</th>
+                  <th style="text-align: right;">Unit Price</th>
+                  <th style="text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${getUniqueItems(proforma.proforma_items)?.map(item => `
+                  <tr>
+                    <td>${item.description}</td>
+                    <td style="text-align: right;">${item.quantity}</td>
+                    <td style="text-align: right;">${item.unit_price.toLocaleString()}</td>
+                    <td style="text-align: right;">${(item.quantity * item.unit_price).toLocaleString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <!-- Summary Section -->
+            <div class="summary-section">
+              <div class="summary-row">
+                <span>Subtotal:</span>
+                <span>${proforma.amount.toLocaleString()} ${proforma.currency}</span>
+              </div>
+              ${proforma.discount_rate && proforma.discount_rate > 0 ? `
+                <div class="summary-row">
+                  <span>Discount (${proforma.discount_rate}%):</span>
+                  <span style="color: #ff9800;">-${(proforma.discount_amount || 0).toLocaleString()} ${proforma.currency}</span>
+                </div>
+              ` : ''}
+              ${proforma.tax_rate && proforma.tax_rate > 0 ? `
+                <div class="summary-row">
+                  <span>Tax (${proforma.tax_rate}%):</span>
+                  <span style="color: #1976d2;">+${(proforma.tax_amount || 0).toLocaleString()} ${proforma.currency}</span>
+                </div>
+              ` : ''}
+              <div class="summary-row final">
+                <span>FINAL TOTAL:</span>
+                <span>${(proforma.total_amount || proforma.amount).toLocaleString()} ${proforma.currency}</span>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+              <p>This is an automatically generated proforma invoice.</p>
+              <p class="footer-note">Generated on: ${new Date().toLocaleString()}</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      if (format === 'pdf') {
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Proforma-${proforma.number}.html`;
+        link.click();
+      } else {
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Proforma-${proforma.number}.html`;
+        link.click();
+      }
+    } catch (error) {
+      console.error('Error generating proforma document:', error);
+      toast.error('Error generating document');
     }
   };
 
