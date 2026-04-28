@@ -42,6 +42,11 @@ interface ProformaItem {
 
 interface ProformaWithItems extends Proforma {
   proforma_items?: ProformaItem[];
+  discount_rate?: number;
+  discount_amount?: number;
+  tax_rate?: number;
+  tax_amount?: number;
+  total_amount?: number;
 }
 
 export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
@@ -149,7 +154,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       if (error) throw error;
       
       // Ensure all proformas have all required fields with defaults
-      const processedData = (data || []).map(proforma => {
+      const processedData = (data || []).map((proforma: any) => {
         const subtotal = proforma.amount || 0;
         const discountAmount = proforma.discount_amount !== null && proforma.discount_amount !== undefined ? proforma.discount_amount : 0;
         const taxAmount = proforma.tax_amount !== null && proforma.tax_amount !== undefined ? proforma.tax_amount : 0;
@@ -239,11 +244,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       
       // ✨ DETECT AND NOTIFY ABOUT NEW PROFORMAS
       const newProformaIds = processedData
-        .filter(p => !lastNotifiedIds.has(p.id))
-        .map(p => p.id);
+        .filter((p: ProformaWithItems) => !lastNotifiedIds.has(p.id))
+        .map((p: ProformaWithItems) => p.id);
       
       if (newProformaIds.length > 0) {
-        const firstNew = processedData.find(p => newProformaIds.includes(p.id));
+        const firstNew = processedData.find((p: ProformaWithItems) => newProformaIds.includes(p.id));
         if (firstNew) {
           // Show in-app notification
           toast.success(
@@ -253,7 +258,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           
           // Update tracked IDs to prevent duplicate notifications
           const updatedIds = new Set(lastNotifiedIds);
-          newProformaIds.forEach(id => updatedIds.add(id));
+          newProformaIds.forEach((id: string) => updatedIds.add(id));
           setLastNotifiedIds(updatedIds);
         }
       }
@@ -403,7 +408,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       }
 
       // Create line items
-      const itemsToInsert = lineItems.map(item => ({
+      const itemsToInsert = lineItems.map((item: ProformaItem) => ({
         proforma_id: proformaData.id,
         description: item.description,
         quantity: item.quantity,
@@ -630,11 +635,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   };
 
   const handleRemoveLineItem = (index: number) => {
-    setLineItems(lineItems.filter((_, i) => i !== index));
+    setLineItems(lineItems.filter((_: ProformaItem, i: number) => i !== index));
   };
 
   const calculateGrandTotal = () => {
-    return lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    return lineItems.reduce((sum: number, item: ProformaItem) => sum + (item.quantity * item.unit_price), 0);
   };
 
   const calculateTotalWithTaxAndDiscount = () => {
@@ -691,7 +696,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     if (!items || items.length === 0) return [];
     
     const uniqueItems: ProformaItem[] = [];
-    items.forEach(item => {
+    items.forEach((item: ProformaItem) => {
       const isDuplicate = uniqueItems.some(u => 
         u.description === item.description && 
         u.quantity === item.quantity && 
@@ -714,7 +719,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         const uniqueItems: ProformaItem[] = [];
         const duplicateIds: string[] = [];
         
-        itemsToEdit.forEach(item => {
+        itemsToEdit.forEach((item: ProformaItem) => {
           const isDuplicate = uniqueItems.some(u => 
             u.description === item.description && 
             u.quantity === item.quantity && 
@@ -777,7 +782,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const uniqueItems: ProformaItem[] = [];
       let duplicatesRemoved = 0;
       
-      editLineItems.forEach(item => {
+      editLineItems.forEach((item: ProformaItem) => {
         const key = `${item.description}|${item.quantity}|${item.unit_price}`;
         const isDuplicate = uniqueItems.some(u => 
           u.description === item.description && 
@@ -954,6 +959,23 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setExportPendingProforma(null);
   };
 
+  const resetForm = () => {
+    setFormData({
+      number: '',
+      client_name: '',
+      client_phone: '',
+      client_email: '',
+      currency: 'RWF',
+      description: '',
+      valid_until: '',
+      tax_rate: 0,
+      discount_rate: 0,
+    });
+    setLineItems([]);
+    setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
+    setShowNew(false);
+  };
+
   const generateProformaDocument = (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
     // Generate HTML content
     const html = `
@@ -1057,12 +1079,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
-  const filteredProformas = proformas.filter(p =>
+  const filteredProformas = proformas.filter((p: ProformaWithItems) =>
     p.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredReceivedProformas = receivedProformas.filter(p =>
+  const filteredReceivedProformas = receivedProformas.filter((p: ProformaWithItems) =>
     p.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -1084,7 +1106,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         <Button onClick={async () => {
           if (!showNew) {
             const nextNum = await generateNextProformaNumber();
-            setFormData(prev => ({ ...prev, number: nextNum }));
+            setFormData((prev: typeof formData) => ({ ...prev, number: nextNum }));
           }
           setShowNew(!showNew);
         }} className="gap-2 w-full sm:w-auto">
@@ -1107,9 +1129,9 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 {/* Customer Selector */}
                 <div className="border-b pb-4">
                   <CustomerSelector
-                    onSelectCustomer={(customer) => {
+                    onSelectCustomer={(customer: Customer) => {
                       setSelectedCustomer(customer);
-                      setFormData(prev => ({
+                      setFormData((prev: typeof formData) => ({
                         ...prev,
                         client_name: customer.full_name,
                         client_phone: customer.phone_number || '',
@@ -1137,7 +1159,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         <Label>Currency</Label>
                         <select
                           value={formData.currency}
-                          onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, currency: e.target.value })}
                           className="w-full p-2 border rounded"
                         >
                           <option value="RWF">RWF</option>
@@ -1153,34 +1175,36 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 <div className="hidden">
                   <Input
                     value={formData.client_name}
-                    onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, client_name: e.target.value })}
                     placeholder={t('invoices.client_name')}
                   />
                   <Input
                     value={formData.client_phone}
-                    onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, client_phone: e.target.value })}
                     placeholder="+250..."
                   />
                   <Input
                     value={formData.client_email}
-                    onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, client_email: e.target.value })}
                     placeholder="client@example.com"
                   />
                 </div>
-                    <div>
-                      <Label>{t('proforma.valid_until')}</Label>
-                      <Input
-                        type="date"
-                        value={formData.valid_until}
-                        onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
-                      />
-                    </div>
+
+                {/* Valid Until Section */}
+                <div className="border-b pb-4">
+                  <div>
+                    <Label>{t('proforma.valid_until')}</Label>
+                    <Input
+                      type="date"
+                      value={formData.valid_until}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, valid_until: e.target.value })}
+                    />
                   </div>
                   <div className="mt-4">
                     <Label>{t('invoices.description')}</Label>
                     <textarea
                       value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
                       placeholder={t('invoices.description')}
                       className="w-full p-2 border rounded"
                       rows={3}
@@ -1196,7 +1220,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       <Label>Description</Label>
                       <Input
                         value={currentItem.description}
-                        onChange={(e) => setCurrentItem({ ...currentItem, description: e.target.value })}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentItem({ ...currentItem, description: e.target.value })}
                         placeholder="Item description"
                       />
                     </div>
@@ -1205,7 +1229,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       <Input
                         type="number"
                         value={currentItem.quantity}
-                        onChange={(e) => setCurrentItem({ ...currentItem, quantity: Number(e.target.value) })}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentItem({ ...currentItem, quantity: Number(e.target.value) })}
                         placeholder="1"
                         min="1"
                         step="0.01"
@@ -1216,7 +1240,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       <Input
                         type="number"
                         value={currentItem.unit_price}
-                        onChange={(e) => setCurrentItem({ ...currentItem, unit_price: Number(e.target.value) })}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentItem({ ...currentItem, unit_price: Number(e.target.value) })}
                         placeholder="0.00"
                         min="0"
                         step="0.01"
@@ -1249,7 +1273,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                           </tr>
                         </thead>
                         <tbody>
-                          {lineItems.map((item, index) => (
+                          {lineItems.map((item: ProformaItem, index: number) => (
                             <tr key={index} className="border-t">
                               <td className="p-3">{item.description}</td>
                               <td className="p-3 text-right">{item.quantity}</td>
@@ -1293,7 +1317,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       <Input
                         type="number"
                         value={formData.discount_rate}
-                        onChange={(e) => setFormData({ ...formData, discount_rate: Number(e.target.value) })}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, discount_rate: Number(e.target.value) })}
                         placeholder="0"
                         min="0"
                         max="100"
@@ -1308,7 +1332,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       <Input
                         type="number"
                         value={formData.tax_rate}
-                        onChange={(e) => setFormData({ ...formData, tax_rate: Number(e.target.value) })}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, tax_rate: Number(e.target.value) })}
                         placeholder="0"
                         min="0"
                         max="100"
@@ -1375,7 +1399,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={currentTab} onValueChange={(val: any) => setCurrentTab(val)}>
+          <Tabs value={currentTab} onValueChange={(val: string) => setCurrentTab(val as 'my' | 'received')}>
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="my" className="gap-2">
                 <FileDown className="h-4 w-4" />
@@ -1391,7 +1415,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <Input
                 placeholder={`${t('proforma.number')}...`}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               />
             </div>
 
@@ -1402,7 +1426,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   {t('proforma.empty')}
                 </div>
               ) : (
-                filteredProformas.map((proforma) => (
+                filteredProformas.map((proforma: ProformaWithItems) => (
                   <motion.div
                     key={proforma.id}
                     initial={{ opacity: 0 }}
@@ -1448,7 +1472,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       {proforma.proforma_items && proforma.proforma_items.length > 0 && (
                         <div className="mt-3 text-xs">
                           <div className="border-t pt-2">
-                            {getUniqueItems(proforma.proforma_items).map((item, idx) => (
+                            {getUniqueItems(proforma.proforma_items).map((item: ProformaItem, idx: number) => (
                               <div key={idx} className="flex justify-between py-1 px-2 bg-muted/50 rounded mb-1">
                                 <span>{item.description}</span>
                                 <span className="text-right">
@@ -1594,7 +1618,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   📭 No proformas received yet
                 </div>
               ) : (
-                filteredReceivedProformas.map((proforma) => (
+                filteredReceivedProformas.map((proforma: ProformaWithItems) => (
                   <motion.div
                     key={proforma.id}
                     initial={{ opacity: 0 }}
@@ -1634,7 +1658,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                     {/* Items Summary - UNIQUE ONLY */}
                     <div className="mb-3 text-sm bg-white p-2 rounded">
                       <p className="font-semibold mb-1">Items:</p>
-                      {getUniqueItems(proforma.proforma_items).map((item, idx) => (
+                      {getUniqueItems(proforma.proforma_items).map((item: ProformaItem, idx: number) => (
                         <div key={idx} className="flex justify-between text-xs">
                           <span>{item.description} × {item.quantity}</span>
                           <span>{(item.quantity * item.unit_price).toLocaleString()}</span>
@@ -1776,7 +1800,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       </tr>
                     </thead>
                     <tbody>
-                      {getUniqueItems(previewProforma.proforma_items).map((item, idx) => (
+                      {getUniqueItems(previewProforma.proforma_items).map((item: ProformaItem, idx: number) => (
                         <tr key={idx} className="border-t">
                           <td className="p-2">{item.description}</td>
                           <td className="p-2 text-right">{item.quantity}</td>
@@ -2001,13 +2025,13 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                     )}
                     
                     <div className="space-y-2">
-                      {editLineItems.map((item, idx) => (
+                      {editLineItems.map((item: ProformaItem, idx: number) => (
                         <div key={idx} className="flex gap-2 p-2 border rounded bg-white">
                           <div className="flex-1">
                             <Input
                               placeholder="Description"
                               value={item.description}
-                              onChange={(e) => {
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                 const updated = [...editLineItems];
                                 updated[idx].description = e.target.value;
                                 setEditLineItems(updated);
@@ -2020,7 +2044,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                               type="number"
                               placeholder="Qty"
                               value={item.quantity}
-                              onChange={(e) => {
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                 const updated = [...editLineItems];
                                 updated[idx].quantity = Math.max(1, Number(e.target.value));
                                 setEditLineItems(updated);
@@ -2034,7 +2058,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                               type="number"
                               placeholder="Unit Price"
                               value={item.unit_price}
-                              onChange={(e) => {
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                 const updated = [...editLineItems];
                                 updated[idx].unit_price = Number(e.target.value);
                                 setEditLineItems(updated);
@@ -2048,7 +2072,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setEditLineItems(editLineItems.filter((_, i) => i !== idx))}
+                            onClick={() => setEditLineItems(editLineItems.filter((_: ProformaItem, i: number) => i !== idx))}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
