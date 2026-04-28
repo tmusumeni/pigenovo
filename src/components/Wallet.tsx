@@ -32,6 +32,8 @@ export function Wallet({ user }: { user: any }) {
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('');
   const [details, setDetails] = useState('');
+  const [totalProformaCharges, setTotalProformaCharges] = useState(0); // Export + Send fees
+  const [chargesBreakdown, setChargesBreakdown] = useState({ export_fee: 0, send_fee: 0 });
 
   useEffect(() => {
     fetchWallet();
@@ -147,6 +149,21 @@ export function Wallet({ user }: { user: any }) {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     setTransactions(data || []);
+    
+    // Calculate proforma charges breakdown
+    if (data) {
+      const exportFees = data
+        .filter((tx: any) => tx.method === 'export_fee' && tx.status === 'approved')
+        .reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
+      
+      const sendFees = data
+        .filter((tx: any) => tx.method === 'send_fee' && tx.status === 'approved')
+        .reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
+      
+      setChargesBreakdown({ export_fee: exportFees, send_fee: sendFees });
+      setTotalProformaCharges(exportFees + sendFees);
+    }
+    
     setLoading(false);
     fetchEarnedBalance(); // Recalculate earned balance
   };
@@ -354,6 +371,27 @@ export function Wallet({ user }: { user: any }) {
               )}
             </div>
 
+            {/* Proforma Charges Spent */}
+            <div className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="text-xs font-bold text-orange-700 dark:text-orange-200 uppercase tracking-wider mb-2">📤 Export Charges</div>
+              <div className="text-xl font-bold text-orange-900 dark:text-orange-100">{chargesBreakdown.export_fee.toLocaleString()} RWF</div>
+              <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Spent on exports</p>
+            </div>
+
+            {/* Send Charges */}
+            <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+              <div className="text-xs font-bold text-purple-700 dark:text-purple-200 uppercase tracking-wider mb-2">📧 Send Charges</div>
+              <div className="text-xl font-bold text-purple-900 dark:text-purple-100">{chargesBreakdown.send_fee.toLocaleString()} RWF</div>
+              <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">Spent on sends</p>
+            </div>
+
+            {/* Total Proforma Charges */}
+            <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
+              <div className="text-xs font-bold text-red-700 dark:text-red-200 uppercase tracking-wider mb-2">💳 Total Platform Charges</div>
+              <div className="text-2xl font-bold text-red-900 dark:text-red-100">{totalProformaCharges.toLocaleString()} RWF</div>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Export + Send fees</p>
+            </div>
+
             {/* Total Balance */}
             <div className="p-4 bg-primary/20 dark:bg-primary/30 rounded-lg border border-primary/40 md:col-span-2">
               <div className="text-xs font-bold text-primary-foreground/70 uppercase tracking-wider mb-2">Total Balance</div>
@@ -557,25 +595,55 @@ export function Wallet({ user }: { user: any }) {
                 <p className="text-sm">No transactions found.</p>
               </div>
             ) : (
-              transactions.map((tx) => (
+              transactions.map((tx) => {
+                // Helper to get method label with emoji
+                const getMethodLabel = (method: string) => {
+                  const labels: Record<string, string> = {
+                    'export_fee': '📤 Proforma Export',
+                    'send_fee': '📧 Proforma Send',
+                    'rwf_momo': 'MoMo Transfer',
+                    'pi_network': '🟡 Pi Network',
+                    'usdt': '💵 USDT',
+                    'bank_transfer': '🏦 Bank Transfer',
+                    'earnings_transfer': '⭐ Earnings Transfer',
+                    'withdrawal': '💸 Withdrawal',
+                    'deposit': '💰 Deposit'
+                  };
+                  return labels[method] || method.replace('_', ' ');
+                };
+
+                return (
                 <div key={tx.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border">
                   <div className="flex items-center gap-4">
                     <div className={cn(
                       "p-3 rounded-full",
+                      (tx.method === 'export_fee' || tx.method === 'send_fee') ? "bg-orange-500/10 text-orange-600" :
                       tx.type === 'deposit' ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
                     )}>
-                      {tx.type === 'deposit' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                      {(tx.method === 'export_fee' || tx.method === 'send_fee') ? <Coins className="h-5 w-5" /> :
+                       tx.type === 'deposit' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
                     </div>
                     <div>
                       <div className="font-bold flex items-center gap-2 uppercase text-xs">
-                        {tx.type} via {tx.method.replace('_', ' ')}
+                        {getMethodLabel(tx.method)}
                         {tx.status === 'pending' && <span className="bg-yellow-500/10 text-yellow-600 px-1.5 py-0.5 rounded text-[8px]">PENDING</span>}
                         {tx.status === 'approved' && <span className="bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded text-[8px]">COMPLETED</span>}
                         {tx.status === 'rejected' && <span className="bg-red-500/10 text-red-600 px-1.5 py-0.5 rounded text-[8px]">REJECTED</span>}
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                        {new Date(tx.created_at).toLocaleString()} | {tx.details?.note}
+                        {new Date(tx.created_at).toLocaleString()} 
+                        {tx.details?.note && ` | ${tx.details.note}`}
                       </div>
+                      {tx.details?.proforma_id && (
+                        <div className="text-[9px] text-muted-foreground mt-1 flex items-center gap-2">
+                          📋 Proforma ID: <span className="font-mono text-[8px]">{tx.details.proforma_id.substring(0, 8)}</span>
+                        </div>
+                      )}
+                      {tx.details?.description && (
+                        <div className="text-[9px] text-muted-foreground mt-1">
+                          {tx.details.description}
+                        </div>
+                      )}
                       {tx.details?.user_phone && (
                         <div className="text-[9px] text-muted-foreground mt-1 flex items-center gap-1">
                           <span className="text-sm">{tx.details.user_phone_flag}</span>
@@ -588,13 +656,16 @@ export function Wallet({ user }: { user: any }) {
                   <div className="text-right">
                     <div className={cn(
                       "font-mono font-bold",
+                      (tx.method === 'export_fee' || tx.method === 'send_fee') ? "text-orange-600" :
                       tx.type === 'deposit' ? "text-green-600" : "text-red-600"
                     )}>
-                      {tx.type === 'deposit' ? '+' : '-'}{tx.amount.toLocaleString()} <span className="text-[10px] font-normal">{tx.currency}</span>
+                      {(tx.method === 'export_fee' || tx.method === 'send_fee') ? '-' : 
+                       tx.type === 'deposit' ? '+' : '-'}{tx.amount.toLocaleString()} <span className="text-[10px] font-normal">{tx.currency}</span>
                     </div>
                   </div>
                 </div>
-              ))
+              );
+              })
             )}
           </div>
         </CardContent>
