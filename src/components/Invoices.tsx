@@ -402,15 +402,15 @@ export function Invoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">{t('invoices.title')}</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold">{t('invoices.title')}</h1>
         <Button onClick={async () => {
           if (!showNew) {
             const nextNum = await generateNextInvoiceNumber();
             setFormData(prev => ({ ...prev, number: nextNum }));
           }
           setShowNew(!showNew);
-        }} className="gap-2">
+        }} className="gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           {t('invoices.new')}
         </Button>
@@ -424,7 +424,7 @@ export function Invoices() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateInvoice} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label>{t('invoices.number')}</Label>
                     <div className="p-2 border rounded bg-muted text-sm font-mono font-bold text-primary">
@@ -482,11 +482,11 @@ export function Invoices() {
                     rows={3}
                   />
                 </div>
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={loading}>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button type="submit" disabled={loading} className="flex-1">
                     {t('common.save')}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowNew(false)}>
+                  <Button type="button" variant="outline" onClick={() => setShowNew(false)} className="flex-1 sm:flex-none">
                     {t('common.cancel')}
                   </Button>
                 </div>
@@ -524,12 +524,12 @@ export function Invoices() {
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
                 >
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                       {getStatusIcon(invoice.status)}
-                      <span className="font-mono font-bold">{invoice.number}</span>
-                      <span className="text-sm text-muted-foreground">{invoice.client_name}</span>
+                      <span className="font-mono font-bold text-xs sm:text-sm">{invoice.number}</span>
+                      <span className="text-xs sm:text-sm text-muted-foreground truncate">{invoice.client_name}</span>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">
+                    <div className="text-xs sm:text-sm text-muted-foreground mt-2">
                       <div>
                         Subtotal: {invoice.amount.toLocaleString()} {invoice.currency}
                       </div>
@@ -550,21 +550,22 @@ export function Invoices() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-1 md:gap-2">
                     {invoice.status === 'draft' && (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handlePayFromWallet(invoice)}
                         disabled={loading}
+                        className="text-xs h-8"
                       >
-                        {t('invoices.pay_from_wallet')}
+                        Pay
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => {
                       setSelectedInvoice(invoice);
                       fetchInvoiceItems(invoice.id);
-                    }} title="Preview Invoice">
+                    }} title="Preview Invoice" className="h-8 w-8 p-0">
                       <Eye className="h-4 w-4" />
                     </Button>
                     <Button
@@ -572,6 +573,7 @@ export function Invoices() {
                       variant="ghost"
                       onClick={() => handleExportInvoice(invoice, 'pdf')}
                       title="Download as PDF"
+                      className="h-8 w-8 p-0"
                     >
                       <Download className="h-4 w-4 text-blue-500" />
                     </Button>
@@ -580,6 +582,7 @@ export function Invoices() {
                       variant="ghost"
                       onClick={() => handleExportInvoice(invoice, 'image')}
                       title="Download as Image"
+                      className="h-8 w-8 p-0"
                     >
                       <Printer className="h-4 w-4 text-green-500" />
                     </Button>
@@ -588,6 +591,7 @@ export function Invoices() {
                       variant="ghost"
                       onClick={() => handleDeleteInvoice(invoice.id)}
                       disabled={loading}
+                      className="h-8 w-8 p-0"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -604,30 +608,30 @@ export function Invoices() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4"
           onClick={() => setSelectedInvoice(null)}
         >
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle>Invoice: {selectedInvoice.number}</CardTitle>
-                <CardDescription>{selectedInvoice.client_name}</CardDescription>
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-xl sm:text-2xl truncate">Invoice: {selectedInvoice.number}</CardTitle>
+                <CardDescription className="truncate">{selectedInvoice.client_name}</CardDescription>
               </div>
-              <Button variant="ghost" onClick={() => setSelectedInvoice(null)}>✕</Button>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedInvoice(null)} className="flex-shrink-0">✕</Button>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent className="space-y-6 p-4 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <p className="text-xs text-muted-foreground">Bill To</p>
-                  <p className="font-bold">{selectedInvoice.client_name}</p>
-                  {selectedInvoice.client_phone && <p className="text-sm">{selectedInvoice.client_phone}</p>}
-                  {selectedInvoice.client_email && <p className="text-sm">{selectedInvoice.client_email}</p>}
+                  <p className="font-bold mt-1">{selectedInvoice.client_name}</p>
+                  {selectedInvoice.client_phone && <p className="text-sm mt-1 break-words">{selectedInvoice.client_phone}</p>}
+                  {selectedInvoice.client_email && <p className="text-sm mt-1 break-words">{selectedInvoice.client_email}</p>}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Invoice #</p>
-                  <p className="font-mono font-bold">{selectedInvoice.number}</p>
-                  <p className="text-xs text-muted-foreground mt-2">Status</p>
-                  <p className="text-xs px-2 py-1 rounded-full font-semibold w-fit bg-blue-100 text-blue-700">
+                  <p className="font-mono font-bold mt-1">{selectedInvoice.number}</p>
+                  <p className="text-xs text-muted-foreground mt-3">Status</p>
+                  <p className="text-xs px-2 py-1 rounded-full font-semibold w-fit bg-blue-100 text-blue-700 mt-1">
                     {selectedInvoice.status.toUpperCase()}
                   </p>
                 </div>
@@ -635,17 +639,18 @@ export function Invoices() {
 
               {invoiceItems.length > 0 && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Line Items</p>
-                  <table className="w-full text-sm border rounded">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="p-2 text-left">Description</th>
-                        <th className="p-2 text-right">Qty</th>
-                        <th className="p-2 text-right">Unit Price</th>
-                        <th className="p-2 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <p className="text-xs text-muted-foreground mb-3">Line Items</p>
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <table className="w-full text-xs sm:text-sm border rounded min-w-[300px]">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="p-2 text-left">Description</th>
+                          <th className="p-2 text-right">Qty</th>
+                          <th className="p-2 text-right">Unit Price</th>
+                          <th className="p-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
                       {invoiceItems.map((item, idx) => (
                         <tr key={idx} className="border-t">
                           <td className="p-2">{item.description}</td>

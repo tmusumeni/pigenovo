@@ -224,12 +224,12 @@ export function Auth() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] p-4">
+    <div className="flex items-center justify-center min-h-screen p-3 sm:p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md max-h-[95vh] overflow-y-auto"
       >
         {!isConfigured && (
           <Card className="mb-6 border-destructive bg-destructive/5">

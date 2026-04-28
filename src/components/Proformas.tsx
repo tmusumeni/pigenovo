@@ -1079,15 +1079,15 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">{t('proforma.title')}</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold">{t('proforma.title')}</h1>
         <Button onClick={async () => {
           if (!showNew) {
             const nextNum = await generateNextProformaNumber();
             setFormData(prev => ({ ...prev, number: nextNum }));
           }
           setShowNew(!showNew);
-        }} className="gap-2">
+        }} className="gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           {t('proforma.new')}
         </Button>
@@ -1125,7 +1125,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 {selectedCustomer && (
                   <div className="border-b pb-4">
                     <h3 className="font-bold mb-3 text-sm text-muted-foreground">Proforma Settings</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label>{t('proforma.number')}</Label>
                         <div className="p-2 border rounded bg-muted text-sm font-mono font-bold text-primary">

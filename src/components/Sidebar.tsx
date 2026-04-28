@@ -24,9 +24,10 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isAdmin: boolean;
   onSignOut: () => void;
+  onMenuClick?: () => void;
 }
 
-export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut, onMenuClick }: SidebarProps) {
   const [pendingCount, setPendingCount] = useState(0);
   const { t } = useLanguage();
 
@@ -65,27 +66,27 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
 
   return (
     <aside className="w-64 bg-card border-r flex flex-col h-screen sticky top-0">
-      <div className="p-6 flex items-center gap-3">
-        <div className="bg-primary text-primary-foreground p-2 rounded-xl">
+      <div className="p-4 md:p-6 flex items-center gap-3 border-b">
+        <div className="bg-primary text-primary-foreground p-2 rounded-xl flex-shrink-0">
           <Zap className="h-6 w-6" />
         </div>
-        <span className="font-bold text-xl tracking-tighter">PiGenovo 2.0</span>
+        <span className="font-bold text-lg md:text-xl tracking-tighter truncate">PiGenovo 2.0</span>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="flex-1 px-2 md:px-4 py-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
+              "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all",
               activeTab === item.id 
                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
-            <item.icon className="h-5 w-5" />
-            {item.label}
+            <item.icon className="h-5 w-5 flex-shrink-0" />
+            <span className="truncate">{item.label}</span>
           </button>
         ))}
 
@@ -93,18 +94,18 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
           <button
             onClick={() => setActiveTab('admin')}
             className={cn(
-              "w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all",
+              "w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-all",
               activeTab === 'admin'
                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="h-5 w-5" />
-              {t('nav.admin')}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <ShieldCheck className="h-5 w-5 flex-shrink-0" />
+              <span className="truncate">{t('nav.admin')}</span>
             </div>
             {pendingCount > 0 && (
-              <span className="bg-orange-500 text-white text-[10px] h-5 w-5 flex items-center justify-center rounded-full border-2 border-card">
+              <span className="bg-orange-500 text-white text-[10px] h-5 w-5 flex items-center justify-center rounded-full border-2 border-card ml-2 flex-shrink-0">
                 {pendingCount}
               </span>
             )}
@@ -112,17 +113,17 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
         )}
       </nav>
 
-      <div className="p-4 border-t space-y-2">
+      <div className="p-4 md:p-4 border-t space-y-2">
         <div className="pb-2">
           <LanguageSelector />
         </div>
         <Button 
           variant="ghost" 
-          className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-sm"
           onClick={onSignOut}
         >
-          <LogOut className="h-5 w-5 mr-3" />
-          {t('nav.logout')}
+          <LogOut className="h-5 w-5 mr-3 flex-shrink-0" />
+          <span className="truncate">{t('nav.logout')}</span>
         </Button>
       </div>
     </aside>
