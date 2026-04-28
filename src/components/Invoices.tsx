@@ -662,6 +662,7 @@ export function Invoices() {
                     </tbody>
                   </table>
                 </div>
+              </div>
               )}
 
               {/* Tax and Discount Display */}
