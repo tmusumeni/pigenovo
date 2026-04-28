@@ -222,23 +222,57 @@ export function AdminPanel() {
 
   const fetchProformaCharge = async () => {
     try {
-      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
-      if (data) {
-        setProformaExportCharge(data.value.charge.toString());
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'proforma_export_charge')
+        .single();
+
+      if (error) {
+        // If record doesn't exist yet, try to create it with default value
+        console.log('Export charge not found, initializing with default 1000');
+        const { error: insertError } = await supabase
+          .from('settings')
+          .insert({
+            id: 'proforma_export_charge',
+            value: { charge: 1000 }
+          });
+        if (insertError) console.error('Error initializing export charge:', insertError);
+        setProformaExportCharge('1000');
+      } else if (data) {
+        setProformaExportCharge(data.value?.charge?.toString() || '1000');
       }
     } catch (error) {
-      // Use default if not set
+      console.error('Error fetching export charge:', error);
+      setProformaExportCharge('1000'); // Use default if not set
     }
   };
 
   const fetchProformaSendCharge = async () => {
     try {
-      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_send_charge').single();
-      if (data) {
-        setProformaSendCharge(data.value.charge.toString());
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 'proforma_send_charge')
+        .single();
+
+      if (error) {
+        // If record doesn't exist yet, try to create it with default value
+        console.log('Send charge not found, initializing with default 500');
+        const { error: insertError } = await supabase
+          .from('settings')
+          .insert({
+            id: 'proforma_send_charge',
+            value: { charge: 500 }
+          });
+        if (insertError) console.error('Error initializing send charge:', insertError);
+        setProformaSendCharge('500');
+      } else if (data) {
+        setProformaSendCharge(data.value?.charge?.toString() || '500');
       }
     } catch (error) {
-      // Use default if not set
+      console.error('Error fetching send charge:', error);
+      setProformaSendCharge('500'); // Use default if not set
     }
   };
 
@@ -977,15 +1011,33 @@ export function AdminPanel() {
     e.preventDefault();
     try {
       setLoading(true);
+      
+      const chargeValue = Number(proformaExportCharge);
+      if (isNaN(chargeValue) || chargeValue < 0) {
+        toast.error('Please enter a valid charge amount');
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.from('settings').upsert({
         id: 'proforma_export_charge',
-        value: { charge: Number(proformaExportCharge) }
+        value: { charge: chargeValue },
+        updated_at: new Date().toISOString()
       });
-      if (error) throw error;
-      toast.success('Proforma export charge updated');
-      fetchProformaCharge();
+      
+      if (error) {
+        console.error('Upsert error:', error);
+        throw error;
+      }
+      
+      toast.success(`✅ Proforma export charge updated to ${chargeValue} RWF`);
+      console.log('Export charge saved successfully:', chargeValue);
+      
+      // Refresh the value to confirm it was saved
+      await fetchProformaCharge();
     } catch (error: any) {
-      toast.error(error.message);
+      console.error('Error updating export charge:', error);
+      toast.error(error.message || 'Failed to update export charge');
     } finally {
       setLoading(false);
     }
@@ -995,15 +1047,33 @@ export function AdminPanel() {
     e.preventDefault();
     try {
       setLoading(true);
+      
+      const chargeValue = Number(proformaSendCharge);
+      if (isNaN(chargeValue) || chargeValue < 0) {
+        toast.error('Please enter a valid charge amount');
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.from('settings').upsert({
         id: 'proforma_send_charge',
-        value: { charge: Number(proformaSendCharge) }
+        value: { charge: chargeValue },
+        updated_at: new Date().toISOString()
       });
-      if (error) throw error;
-      toast.success('Proforma send charge updated');
-      fetchProformaSendCharge();
+      
+      if (error) {
+        console.error('Upsert error:', error);
+        throw error;
+      }
+      
+      toast.success(`✅ Proforma send charge updated to ${chargeValue} RWF`);
+      console.log('Send charge saved successfully:', chargeValue);
+      
+      // Refresh the value to confirm it was saved
+      await fetchProformaSendCharge();
     } catch (error: any) {
-      toast.error(error.message);
+      console.error('Error updating send charge:', error);
+      toast.error(error.message || 'Failed to update send charge');
     } finally {
       setLoading(false);
     }
