@@ -67,8 +67,12 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut, onMenuCli
   return (
     <aside className="w-64 bg-card border-r flex flex-col h-screen sticky top-0">
       <div className="p-4 md:p-6 flex items-center gap-3 border-b">
-        <div className="bg-primary text-primary-foreground p-2 rounded-xl flex-shrink-0">
-          <Zap className="h-6 w-6" />
+        <div className="flex-shrink-0">
+          <img 
+            src="/logo.png" 
+            alt="PiGenovo Logo" 
+            className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-lg"
+          />
         </div>
         <span className="font-bold text-lg md:text-xl tracking-tighter truncate">PiGenovo 2.0</span>
       </div>

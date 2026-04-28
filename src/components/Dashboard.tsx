@@ -135,15 +135,25 @@ export function Dashboard({ user }: { user: any }) {
 
       <div className="flex-1 flex flex-col min-w-0 w-full">
         <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-20">
-          {/* Mobile Menu Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-          >
-            {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </Button>
+          {/* Mobile Menu Button + Logo */}
+          <div className="flex items-center gap-3 lg:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="flex-shrink-0"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </Button>
+            <div className="flex items-center gap-2">
+              <img 
+                src="/logo.png" 
+                alt="PiGenovo Logo" 
+                className="h-8 w-8 object-contain rounded"
+              />
+              <span className="font-bold text-lg truncate">PiGenovo 2.0</span>
+            </div>
+          </div>
 
           <div className="flex-1 max-w-md relative hidden md:block ml-4 lg:ml-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
