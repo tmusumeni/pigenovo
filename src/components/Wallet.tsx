@@ -278,8 +278,9 @@ export function Wallet({ user }: { user: any }) {
 
       if (insertError) throw insertError;
 
-      // 2. If approved deposit OR withdrawal, update balance
-      if (status === 'approved' || action === 'withdraw') {
+      // 2. If approved, update balance immediately
+      // Deposits: add funds | Withdrawals: deduct funds
+      if (status === 'approved') {
         const { data: wallet } = await supabase
           .from('wallets')
           .select('balance')
@@ -287,7 +288,9 @@ export function Wallet({ user }: { user: any }) {
           .single();
 
         const currentBalance = Number(wallet?.balance) || 0;
-        const newBalance = status === 'approved' ? currentBalance + rwfAmount : currentBalance - rwfAmount;
+        const newBalance = action === 'deposit' 
+          ? currentBalance + rwfAmount 
+          : currentBalance - rwfAmount;
 
         const { error: walletError } = await supabase
           .from('wallets')
@@ -299,7 +302,7 @@ export function Wallet({ user }: { user: any }) {
       }
 
       if (status === 'approved') {
-        toast.success(`Successfully credited ${rwfAmount.toLocaleString()} RWF to your wallet!`);
+        toast.success(`Successfully ${action === 'deposit' ? 'added' : 'withdrawn'} ${rwfAmount.toLocaleString()} RWF ${action === 'deposit' ? 'to' : 'from'} your wallet!`);
       } else {
         toast.success(`${action === 'deposit' ? 'Deposit' : 'Withdrawal'} request submitted! Waiting for admin approval.`);
       }
