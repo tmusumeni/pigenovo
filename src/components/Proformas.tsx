@@ -65,6 +65,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [editProforma, setEditProforma] = useState<ProformaWithItems | null>(null);
   const [editLineItems, setEditLineItems] = useState<ProformaItem[]>([]);
   const [exportCharge, setExportCharge] = useState(1000);
+  const [sendCharge, setSendCharge] = useState(500);
   const [showSaveAfterExport, setShowSaveAfterExport] = useState(false);
   const [exportPendingProforma, setExportPendingProforma] = useState<ProformaWithItems | null>(null);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'image'>('pdf');
@@ -115,6 +116,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       fetchProformas();
       fetchReceivedProformas();
       fetchExportCharge();
+      fetchSendCharge();
     };
     init();
 
@@ -531,6 +533,27 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Check wallet balance before sending
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (walletError || !wallet) {
+        toast.error('Unable to check wallet balance');
+        setLoading(false);
+        return;
+      }
+
+      // Check if balance is sufficient for send charge
+      if (wallet.balance < sendCharge) {
+        toast.error(`Insufficient wallet balance. Need ${sendCharge} RWF to send proforma`);
+        toast.info(`Current balance: ${wallet.balance} RWF`);
+        setLoading(false);
+        return;
+      }
+
       // Use RPC function to send proforma to receiver (NEW VERSION)
       const { data, error } = await supabase.rpc('send_proforma_to_receiver_v2', {
         p_proforma_id: proforma.id,
@@ -542,8 +565,32 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       if (!data || !data.success) {
         throw new Error(data?.error || 'Failed to send proforma');
       }
-      
+
+      // Deduct charge from wallet
+      const { error: updateError } = await supabase
+        .from('wallets')
+        .update({ balance: wallet.balance - sendCharge })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      // Record transaction
+      const { error: transError } = await supabase
+        .from('wallet_transactions')
+        .insert([{
+          user_id: user.id,
+          type: 'withdrawal',
+          method: 'send_fee',
+          amount: sendCharge,
+          currency: 'RWF',
+          status: 'approved',
+          details: { proforma_id: proforma.id, description: `Proforma ${proforma.number} send to ${proforma.client_email}`, fee_type: 'proforma_send' }
+        }]);
+
+      if (transError) throw transError;
+
       toast.success(`✅ Proforma sent to ${proforma.client_email}`);
+      toast.info(`💳 Send charge of ${sendCharge} RWF deducted from your wallet`);
       
       // Reset search and switch to My Proformas tab to show updated status
       setSearchTerm('');
@@ -564,6 +611,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         toast.info('💡 Receiver must be registered in the system first');
       } else if (errorMsg.includes('already sent')) {
         toast.info('This proforma has already been sent');
+      } else if (errorMsg.includes('wallet')) {
+        toast.info('💳 Wallet balance issue - try topping up your wallet');
       }
     } finally {
       setLoading(false);
@@ -733,6 +782,17 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       }
     } catch (error) {
       setExportCharge(1000); // Default charge
+    }
+  };
+
+  const fetchSendCharge = async () => {
+    try {
+      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_send_charge').single();
+      if (data) {
+        setSendCharge(data.value.charge || 500);
+      }
+    } catch (error) {
+      setSendCharge(500); // Default charge
     }
   };
 
