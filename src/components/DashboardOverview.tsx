@@ -30,7 +30,7 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
   const [rates, setRates] = useState({ usdt_rwf: 1300, pi_rwf: 45000 });
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editForm, setEditForm] = useState({ phone_number: '', country: '', country_code: '', phone_flag: '' });
+  const [editForm, setEditForm] = useState({ phone_number: '', country: '', country_code: '', phone_flag: '', tin_number: '', company_name: '' });
 
   useEffect(() => {
     fetchData();
@@ -60,7 +60,9 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
         phone_number: profile.phone_number || '',
         country: profile.country || '',
         country_code: profile.country_code || '',
-        phone_flag: profile.phone_flag || ''
+        phone_flag: profile.phone_flag || '',
+        tin_number: profile.tin_number || '',
+        company_name: profile.company_name || ''
       });
     }
   }, [profile]);
@@ -134,7 +136,7 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
 
   const handleSaveProfile = async () => {
     if (!editForm.phone_number || !editForm.country_code) {
-      toast.error('Please fill in all fields');
+      toast.error('Please fill in Phone Number and Country');
       return;
     }
 
@@ -146,7 +148,9 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
           phone_number: editForm.phone_number,
           country: editForm.country,
           country_code: editForm.country_code,
-          phone_flag: editForm.phone_flag
+          phone_flag: editForm.phone_flag,
+          tin_number: editForm.tin_number || null,
+          company_name: editForm.company_name || null
         })
         .eq('id', user.id);
 
@@ -159,7 +163,7 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
       }));
 
       setIsEditing(false);
-      toast.success('Profile updated successfully! 🎉');
+      toast.success('✅ Profile updated successfully!');
     } catch (error: any) {
       console.error('Error saving profile:', error);
       toast.error(error.message || 'Failed to update profile');
@@ -264,6 +268,16 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
                   <div className="text-base font-semibold mt-1">{profile?.country || 'Not specified'}</div>
                 </div>
               </div>
+              <div className="space-y-3">
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tax Identification Number (TIN)</div>
+                  <div className="text-base font-semibold mt-1">{profile?.tin_number ? profile.tin_number : '❌ Not set'}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Company Name</div>
+                  <div className="text-base font-semibold mt-1">{profile?.company_name ? profile.company_name : '❌ Not set'}</div>
+                </div>
+              </div>
             </div>
           ) : (
             // Edit Mode
@@ -325,6 +339,38 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
                       Full number: {editForm.phone_flag} +{editForm.country_code} {editForm.phone_number}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* TIN and Company Name Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                <div>
+                  <Label htmlFor="tin_number">Tax Identification Number (TIN)</Label>
+                  <Input
+                    id="tin_number"
+                    placeholder="Enter your TIN (optional)"
+                    value={editForm.tin_number}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, tin_number: e.target.value }))}
+                    maxLength={50}
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Used in professional documents (proformas & invoices)
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="company_name">Company Name</Label>
+                  <Input
+                    id="company_name"
+                    placeholder="Enter your company name (optional)"
+                    value={editForm.company_name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, company_name: e.target.value }))}
+                    maxLength={255}
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Displayed as sender information in documents
+                  </p>
                 </div>
               </div>
               
