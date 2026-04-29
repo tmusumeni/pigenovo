@@ -1308,17 +1308,23 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               flex-direction: column;
               align-items: flex-start;
               justify-content: center;
+              padding: 10px 0;
             }
             .logo-section img {
-              max-width: 300px;
-              height: auto;
-              margin-bottom: 8px;
+              width: 280px;
+              height: 80px;
+              object-fit: contain;
+              margin-bottom: 12px;
+              background: #fff;
+              padding: 8px;
+              border-radius: 4px;
             }
             .logo-text {
               font-size: 14px;
               font-weight: 600;
               color: #1a5490;
               letter-spacing: 1px;
+              margin-top: 4px;
             }
             .qr-section {
               flex-shrink: 0;
@@ -1475,7 +1481,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
             <div class="top-bar">
               <div class="logo-section">
                 <img src="${logoUrl}" alt="" />
-                <div class="logo-text">Pigenovo Generate+Grow+Earn</div>
+                <div class="logo-text"> Generate+Grow+Earn</div>
               </div>
               <div class="qr-section">
                 <img src="${qrCodeDataUrl}" alt="QR Code" />
