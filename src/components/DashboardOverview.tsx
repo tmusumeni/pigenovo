@@ -524,7 +524,3 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
     </div>
   );
 }
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
-}

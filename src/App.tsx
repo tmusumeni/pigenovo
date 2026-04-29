@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import { Auth } from '@/components/Auth';
 import { Dashboard } from '@/components/Dashboard';
+import { FooterTest } from '@/pages/FooterTest';
 import { LanguageProvider } from '@/lib/LanguageContext';
 import { Toaster } from '@/components/ui/sonner';
 import { Zap } from 'lucide-react';
@@ -83,6 +84,10 @@ export default function App() {
                     <Navigate to="/login" replace />
                   )
                 } 
+              />
+              <Route 
+                path="/footer-test" 
+                element={<FooterTest />} 
               />
               <Route path="*" element={<Navigate to={session ? "/" : "/login"} replace />} />
             </Routes>

@@ -1011,7 +1011,3 @@ export function TradingExchange({ user }: { user: any }) {
     </div>
   );
 }
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
-}

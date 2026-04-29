@@ -33,10 +33,6 @@ import {
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
 
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
-}
-
 export function AdminPanel() {
   const [assets, setAssets] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);

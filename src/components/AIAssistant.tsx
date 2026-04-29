@@ -191,7 +191,3 @@ export function AIAssistant({ user }: { user: any }) {
     </div>
   );
 }
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
-}
