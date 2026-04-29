@@ -1255,8 +1255,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         margin: 1,
       });
 
-      // Logo URL (from public assets)
-      const logoUrl = '/logo.png'; // Relative path to public/logo.png
+      // Logo URL (from public assets) - use absolute URL for exports
+      const logoUrl = `${window.location.origin}/logo.png`;
 
       // Build sender profile section
       const senderSection = userProfile ? `
