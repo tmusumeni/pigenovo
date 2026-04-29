@@ -80,26 +80,46 @@ export function Dashboard({ user }: { user: any }) {
     e.preventDefault();
     setSavingProfile(true);
     try {
-      const { error } = await supabase
+      console.log('Saving TIN and Company Name:', editFormData);
+      
+      const { data, error } = await supabase
         .from('profiles')
         .update({
           tin_number: editFormData.tin_number || null,
           company_name: editFormData.company_name || null
         })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select();
 
-      if (error) throw error;
+      console.log('Update response:', { data, error });
 
-      // Update local profile state
-      setProfile({
-        ...profile,
-        tin_number: editFormData.tin_number,
-        company_name: editFormData.company_name
-      });
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw new Error(error.message || 'Failed to update profile');
+      }
+
+      // Refetch to confirm save
+      const { data: refreshedProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching refreshed profile:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('Refreshed profile from DB:', refreshedProfile);
+      
+      // Update local state with database data
+      setProfile(refreshedProfile);
+      setEditFormData({ tin_number: '', company_name: '' });
 
       setShowEditProfile(false);
       alert('✅ Profile updated successfully!');
     } catch (error: any) {
+      console.error('Error saving profile:', error);
       alert(`Error saving profile: ${error.message}`);
     } finally {
       setSavingProfile(false);

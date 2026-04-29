@@ -142,7 +142,9 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
 
     try {
       setIsSaving(true);
-      const { error } = await supabase
+      console.log('Saving profile with data:', editForm);
+      
+      const { data, error } = await supabase
         .from('profiles')
         .update({
           phone_number: editForm.phone_number,
@@ -152,15 +154,32 @@ export function DashboardOverview({ user, setActiveTab }: { user: any, setActive
           tin_number: editForm.tin_number || null,
           company_name: editForm.company_name || null
         })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select();
 
-      if (error) throw error;
+      console.log('Update response:', { data, error });
 
-      // Update local profile state
-      setProfile(prev => ({
-        ...prev,
-        ...editForm
-      }));
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw new Error(error.message || 'Failed to update profile');
+      }
+
+      // Refetch profile to confirm data was saved
+      const { data: refreshedProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching refreshed profile:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('Refreshed profile from DB:', refreshedProfile);
+      
+      // Update local profile state with database data
+      setProfile(refreshedProfile);
 
       setIsEditing(false);
       toast.success('✅ Profile updated successfully!');
