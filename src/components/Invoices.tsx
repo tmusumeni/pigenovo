@@ -475,7 +475,7 @@ export function Invoices() {
             <!-- Top Bar with Logo, QR, Stamp and Sender -->
             <div class="top-bar">
               <div class="logo-section">
-                <img src="${logoUrl}" alt="Logo" />
+                <img src="${logoUrl}" alt="" />
                 <div class="logo-text">Pigenovo Generate+Grow+Earn</div>
               </div>
               <div class="qr-section">
