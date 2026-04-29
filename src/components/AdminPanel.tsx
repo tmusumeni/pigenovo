@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { cn } from '@/lib/utils';
 import { 
   Card, 
   CardContent, 
