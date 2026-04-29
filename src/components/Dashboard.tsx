@@ -84,8 +84,7 @@ export function Dashboard({ user }: { user: any }) {
         .from('profiles')
         .update({
           tin_number: editFormData.tin_number || null,
-          company_name: editFormData.company_name || null,
-          updated_at: new Date().toISOString()
+          company_name: editFormData.company_name || null
         })
         .eq('id', user.id);
 
