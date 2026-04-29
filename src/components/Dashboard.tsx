@@ -264,7 +264,7 @@ export function Dashboard({ user }: { user: any }) {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -277,6 +277,9 @@ export function Dashboard({ user }: { user: any }) {
             </motion.div>
           </AnimatePresence>
         </main>
+
+        {/* Footer - Now properly inside the main content column */}
+        <Footer />
       </div>
 
       {/* Edit Profile Modal */}
@@ -345,9 +348,6 @@ export function Dashboard({ user }: { user: any }) {
           </Card>
         </motion.div>
       )}
-
-      {/* Footer */}
-      <Footer />
     </div>
   );
 }
