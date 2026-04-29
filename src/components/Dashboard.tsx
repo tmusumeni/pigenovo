@@ -13,15 +13,20 @@ import { Reports } from './Reports';
 import { LanguageSelector } from './LanguageSelector';
 import { RealtimeFeed } from './RealtimeFeed';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bell, Search, User, Menu, X } from 'lucide-react';
+import { Bell, Search, User, Menu, X, Edit2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import logoImage from '@/assets/images/logo.png';
 
 export function Dashboard({ user }: { user: any }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [profile, setProfile] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editFormData, setEditFormData] = useState({ tin_number: '', company_name: '' });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -57,6 +62,49 @@ export function Dashboard({ user }: { user: any }) {
     }
     
     setProfile(currentProfile);
+    setEditFormData({
+      tin_number: currentProfile?.tin_number || '',
+      company_name: currentProfile?.company_name || ''
+    });
+  };
+
+  const handleEditProfileClick = () => {
+    setEditFormData({
+      tin_number: profile?.tin_number || '',
+      company_name: profile?.company_name || ''
+    });
+    setShowEditProfile(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          tin_number: editFormData.tin_number || null,
+          company_name: editFormData.company_name || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Update local profile state
+      setProfile({
+        ...profile,
+        tin_number: editFormData.tin_number,
+        company_name: editFormData.company_name
+      });
+
+      setShowEditProfile(false);
+      alert('✅ Profile updated successfully!');
+    } catch (error: any) {
+      alert(`Error saving profile: ${error.message}`);
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -178,8 +226,19 @@ export function Dashboard({ user }: { user: any }) {
                 <div className="text-sm font-bold">{profile?.full_name || user.email || user.phone}</div>
                 <div className="text-[10px] text-muted-foreground uppercase tracking-widest">{isAdmin ? 'Admin' : (profile?.role || 'User')}</div>
               </div>
-              <div className="h-8 w-8 md:h-10 md:w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/20 text-xs md:text-base">
-                {(user.email?.[0] || user.phone?.[0] || 'U').toUpperCase()}
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 md:h-10 md:w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/20 text-xs md:text-base">
+                  {(user.email?.[0] || user.phone?.[0] || 'U').toUpperCase()}
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleEditProfileClick}
+                  title="Edit Profile (TIN & Company)"
+                  className="gap-1"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </div>
@@ -199,6 +258,73 @@ export function Dashboard({ user }: { user: any }) {
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEditProfile(false)}
+        >
+          <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <CardHeader>
+              <CardTitle>Edit Profile</CardTitle>
+              <CardDescription>Update your TIN and Company information</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div>
+                  <Label htmlFor="tin_number">Tax Identification Number (TIN)</Label>
+                  <Input
+                    id="tin_number"
+                    placeholder="Enter your TIN"
+                    value={editFormData.tin_number}
+                    onChange={(e) => setEditFormData({ ...editFormData, tin_number: e.target.value })}
+                    maxLength={50}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Used in professional documents (proformas, invoices)
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="company_name">Company Name</Label>
+                  <Input
+                    id="company_name"
+                    placeholder="Enter your company name"
+                    value={editFormData.company_name}
+                    onChange={(e) => setEditFormData({ ...editFormData, company_name: e.target.value })}
+                    maxLength={255}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Displayed as sender information in documents
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    type="submit"
+                    disabled={savingProfile}
+                    className="flex-1"
+                  >
+                    {savingProfile ? '💾 Saving...' : '💾 Save Changes'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowEditProfile(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
     </div>
   );
 }
