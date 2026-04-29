@@ -203,7 +203,7 @@ export function Dashboard({ user }: { user: any }) {
       </motion.div>
 
       <div className="flex-1 flex flex-col min-w-0 w-full">
-        <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-20">
+        <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 flex-shrink-0">
           {/* Mobile Menu Button + Logo */}
           <div className="flex items-center gap-3 lg:hidden">
             <Button
@@ -264,22 +264,25 @@ export function Dashboard({ user }: { user: any }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {renderContent()}
-            </motion.div>
-          </AnimatePresence>
-        </main>
+        {/* Scrollable content area with footer */}
+        <div className="flex-1 overflow-y-auto">
+          <main className="p-4 md:p-8 min-h-full">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
+          </main>
 
-        {/* Footer - Now properly inside the main content column */}
-        <Footer />
+          {/* Footer - Inside scrollable area */}
+          <Footer />
+        </div>
       </div>
 
       {/* Edit Profile Modal */}
