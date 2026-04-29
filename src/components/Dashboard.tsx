@@ -10,6 +10,7 @@ import { Wallet } from './Wallet';
 import { Proformas } from './Proformas';
 import { Invoices } from './Invoices';
 import { Reports } from './Reports';
+import { Footer } from './Footer';
 import { LanguageSelector } from './LanguageSelector';
 import { RealtimeFeed } from './RealtimeFeed';
 import { motion, AnimatePresence } from 'motion/react';
@@ -344,6 +345,9 @@ export function Dashboard({ user }: { user: any }) {
           </Card>
         </motion.div>
       )}
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }

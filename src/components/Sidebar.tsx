@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { useLanguage } from '@/lib/LanguageContext';
+import { AboutSection } from '@/components/AboutSection';
 import { supabase } from '../supabaseClient';
 import logoImage from '@/assets/images/logo.png';
 
@@ -131,6 +132,9 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut, onMenuCli
           <span className="truncate">{t('nav.logout')}</span>
         </Button>
       </div>
+
+      {/* About Section */}
+      <AboutSection />
     </aside>
   );
 }

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TeamMembersAdmin } from '@/components/TeamMembersAdmin';
 import { 
   Plus, 
   Trash2, 
@@ -26,7 +27,8 @@ import {
   ArrowDownLeft,
   AlertCircle,
   User,
-  ExternalLink
+  ExternalLink,
+  Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
@@ -1335,6 +1337,10 @@ export function AdminPanel() {
           <TabsTrigger value="wallets" className="rounded-lg flex gap-2 items-center">
             💰 Wallet Analytics
           </TabsTrigger>
+          <TabsTrigger value="team" className="rounded-lg flex gap-2 items-center">
+            <Users className="h-4 w-4" />
+            Team Members
+          </TabsTrigger>
           <TabsTrigger value="users" className="rounded-lg">Users</TabsTrigger>
           <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
         </TabsList>
@@ -2566,6 +2572,10 @@ export function AdminPanel() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="team" className="space-y-6">
+          <TeamMembersAdmin />
         </TabsContent>
 
         <TabsContent value="settings">
