@@ -305,10 +305,21 @@ export function Invoices() {
             }
             .logo-section {
               flex: 1;
+              display: flex;
+              flex-direction: column;
+              align-items: flex-start;
+              justify-content: center;
             }
             .logo-section img {
-              max-width: 400px;
+              max-width: 300px;
               height: auto;
+              margin-bottom: 8px;
+            }
+            .logo-text {
+              font-size: 14px;
+              font-weight: 600;
+              color: #1a5490;
+              letter-spacing: 1px;
             }
             .qr-section {
               flex-shrink: 0;
@@ -464,7 +475,8 @@ export function Invoices() {
             <!-- Top Bar with Logo, QR, Stamp and Sender -->
             <div class="top-bar">
               <div class="logo-section">
-                <img src="${logoUrl}" alt="PiGenovo Logo" />
+                <img src="${logoUrl}" alt="Logo" />
+                <div class="logo-text">Pigenovo Generate+Grow+Earn</div>
               </div>
               <div class="qr-section">
                 <img src="${qrCodeDataUrl}" alt="QR Code" />
