@@ -127,11 +127,46 @@ export function Invoices() {
       const fileExt = stampFile.name.split('.').pop();
       const fileName = `stamps/${user.id}/${invoiceId}/${Date.now()}.${fileExt}`;
       
-      const { error: uploadError } = await supabase.storage
-        .from('proforma-stamps')
-        .upload(fileName, stampFile);
+      // Try to upload - if bucket doesn't exist, create it
+      let uploadError: any = null;
       
-      if (uploadError) throw uploadError;
+      const uploadResult = await supabase.storage
+        .from('proforma-stamps')
+        .upload(fileName, stampFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      uploadError = uploadResult.error;
+      
+      // If bucket doesn't exist, create it and retry
+      if (uploadError?.message?.includes('Bucket not found') || uploadError?.message?.includes('bucket')) {
+        console.log('Creating proforma-stamps bucket...');
+        
+        // Attempt to create bucket via SQL
+        const { error: createBucketError } = await supabase
+          .rpc('create_bucket_if_not_exists', { 
+            bucket_name: 'proforma-stamps',
+            is_public: true 
+          });
+        
+        if (createBucketError) {
+          console.warn('Could not auto-create bucket via RPC, bucket must be created manually in Supabase dashboard');
+          throw new Error('Storage bucket "proforma-stamps" not found. Please create it in your Supabase dashboard (Storage > Create bucket > Name: proforma-stamps)');
+        }
+        
+        // Retry upload after bucket creation
+        const retryResult = await supabase.storage
+          .from('proforma-stamps')
+          .upload(fileName, stampFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        
+        if (retryResult.error) throw retryResult.error;
+      } else if (uploadError) {
+        throw uploadError;
+      }
       
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
@@ -157,7 +192,8 @@ export function Invoices() {
       return publicUrl;
     } catch (error: any) {
       console.error('Error uploading stamp:', error);
-      toast.error('Failed to upload stamp');
+      const errorMsg = error?.message || 'Failed to upload stamp';
+      toast.error(errorMsg);
       return null;
     } finally {
       setStampUploading(false);
