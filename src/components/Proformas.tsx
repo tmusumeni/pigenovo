@@ -30,6 +30,8 @@ interface Proforma {
   sent_date?: string;
   viewed_by_client?: boolean;
   created_at: string;
+  stamp_url?: string;
+  stamp_uploaded_at?: string;
 }
 
 interface ProformaItem {
@@ -47,6 +49,8 @@ interface ProformaWithItems extends Proforma {
   tax_rate?: number;
   tax_amount?: number;
   total_amount?: number;
+  stamp_url?: string;
+  stamp_uploaded_at?: string;
 }
 
 export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
@@ -74,6 +78,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [senderProfiles, setSenderProfiles] = useState<Record<string, any>>({});
+  const [stampFile, setStampFile] = useState<File | null>(null);
+  const [stampPreview, setStampPreview] = useState<string | null>(null);
+  const [stampUploading, setStampUploading] = useState(false);
+  const [currentStampUrl, setCurrentStampUrl] = useState<string | null>(null);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -127,6 +135,80 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleStampFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+      
+      setStampFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setStampPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadStamp = async (proformaId: string) => {
+    if (!stampFile) return null;
+    
+    try {
+      setStampUploading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      
+      const fileExt = stampFile.name.split('.').pop();
+      const fileName = `stamps/${user.id}/${proformaId}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('proforma-stamps')
+        .upload(fileName, stampFile);
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('proforma-stamps')
+        .getPublicUrl(fileName);
+      
+      // Update proforma with stamp URL
+      const { error: updateError } = await supabase
+        .from('proformas')
+        .update({
+          stamp_url: publicUrl,
+          stamp_uploaded_at: new Date().toISOString()
+        })
+        .eq('id', proformaId);
+      
+      if (updateError) throw updateError;
+      
+      setCurrentStampUrl(publicUrl);
+      setStampFile(null);
+      setStampPreview(null);
+      toast.success('Stamp uploaded successfully');
+      await fetchProformas();
+      return publicUrl;
+    } catch (error: any) {
+      console.error('Error uploading stamp:', error);
+      toast.error('Failed to upload stamp');
+      return null;
+    } finally {
+      setStampUploading(false);
+    }
+  };
 
   const generateNextProformaNumber = async () => {
     try {
@@ -473,6 +555,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         .insert(itemsToInsert);
 
       if (itemsError) throw itemsError;
+      
+      // Upload stamp if one was selected
+      if (stampFile) {
+        await uploadStamp(proformaData.id);
+      }
       
       toast.success(`✅ ${proformaData.number} created successfully`);
       setFormData({
@@ -1138,12 +1225,19 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       // Build sender profile section
       const senderSection = userProfile ? `
         <div class="sender-info">
-          <div class="sender-label">From:</div>
-          <p class="sender-name">${userProfile.full_name || 'N/A'}</p>
-          ${userProfile.company_name ? `<p class="sender-company"><strong>Company:</strong> ${userProfile.company_name}</p>` : ''}
-          ${userProfile.phone_number ? `<p class="sender-phone">📱 ${userProfile.phone_number}</p>` : ''}
-          ${userProfile.email ? `<p class="sender-email">✉️ ${userProfile.email}</p>` : ''}
-          ${userProfile.tin_number ? `<p class="sender-tin"><strong>TIN:</strong> ${userProfile.tin_number}</p>` : ''}
+          <div class="sender-label">📤 FROM (Sender Information)</div>
+          <p class="sender-field"><strong>Name:</strong> ${userProfile.full_name || 'N/A'}</p>
+          ${userProfile.email ? `<p class="sender-field"><strong>Email:</strong> ${userProfile.email}</p>` : ''}
+          ${userProfile.phone_number ? `<p class="sender-field"><strong>Phone:</strong> ${userProfile.phone_number}</p>` : ''}
+          ${userProfile.company_name ? `<p class="sender-field"><strong>Company:</strong> ${userProfile.company_name}</p>` : ''}
+          ${userProfile.tin_number ? `<p class="sender-field"><strong>TIN:</strong> ${userProfile.tin_number}</p>` : ''}
+        </div>
+      ` : '';
+
+      // Build stamp section if available
+      const stampSection = proforma.stamp_url ? `
+        <div class="stamp-section">
+          <img src="${proforma.stamp_url}" alt="Stamp" class="stamp-image" />
         </div>
       ` : '';
 
@@ -1194,6 +1288,20 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               margin-top: 5px;
               color: #666;
             }
+            .stamp-section {
+              flex-shrink: 0;
+              text-align: center;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .stamp-image {
+              max-width: 120px;
+              max-height: 120px;
+              border: 1px solid #ddd;
+              border-radius: 5px;
+              padding: 3px;
+            }
             .sender-info {
               flex: 1;
               background: #f9f9f9;
@@ -1206,14 +1314,14 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               font-size: 13px;
               margin-bottom: 8px;
             }
-            .sender-name {
-              font-weight: bold;
-              font-size: 13px;
-              margin-bottom: 3px;
-            }
-            .sender-company, .sender-phone, .sender-email, .sender-tin {
-              margin: 2px 0;
+            .sender-field {
+              margin: 3px 0;
               font-size: 11px;
+              line-height: 1.4;
+            }
+            .sender-field strong {
+              font-weight: 600;
+              color: #1a5490;
             }
             .header-section {
               margin-bottom: 30px;
@@ -1316,7 +1424,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         </head>
         <body>
           <div class="document-container">
-            <!-- Top Bar with Logo, QR, and Sender -->
+            <!-- Top Bar with Logo, QR, Stamp and Sender -->
             <div class="top-bar">
               <div class="logo-section">
                 <img src="${logoUrl}" alt="PiGenovo Logo" />
@@ -1325,6 +1433,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 <img src="${qrCodeDataUrl}" alt="QR Code" />
                 <div class="qr-label">Scan to view</div>
               </div>
+              ${stampSection}
               ${senderSection}
             </div>
 
@@ -1725,6 +1834,52 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   )}
                 </div>
 
+                {/* Stamp Upload Section */}
+                <div className="border-b pb-4">
+                  <h3 className="font-bold mb-4 flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Upload Stamp/Signature
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-50 transition">
+                      <input
+                        type="file"
+                        id="stamp-upload"
+                        accept="image/*"
+                        onChange={handleStampFileSelect}
+                        className="hidden"
+                      />
+                      <label htmlFor="stamp-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                        <ImageIcon className="h-8 w-8 text-gray-400" />
+                        <span className="text-sm font-medium">Click to upload or drag and drop</span>
+                        <span className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</span>
+                      </label>
+                    </div>
+                    
+                    {stampPreview && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Preview:</p>
+                        <img src={stampPreview} alt="Stamp preview" className="max-h-32 border rounded" />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setStampFile(null);
+                            setStampPreview(null);
+                          }}
+                        >
+                          Remove Preview
+                        </Button>
+                      </div>
+                    )}
+                    
+                    <p className="text-xs text-gray-500">
+                      ℹ️ Stamp will appear on the right side of the QR code in preview and export.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
                   <Button type="submit" disabled={loading || lineItems.length === 0}>
                     {t('common.save')}
@@ -1990,21 +2145,26 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         </div>
                       
                       {/* Sender Profile Section */}
-                      <div className="bg-white p-3 rounded-md mb-3 border border-blue-100">
-                        <p className="text-xs font-semibold text-gray-600 mb-2">📨 FROM SENDER:</p>
-                        <p className="text-sm font-bold text-blue-700">{proforma.client_name}</p>
-                        {senderProfiles[proforma.user_id] && (
+                      <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-md mb-3 border border-blue-200 dark:border-blue-800">
+                        <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-2">📤 FROM (Sender Information)</p>
+                        {senderProfiles[proforma.user_id] ? (
                           <>
-                            {senderProfiles[proforma.user_id].phone_number && (
-                              <p className="text-xs text-muted-foreground">📱 {senderProfiles[proforma.user_id].phone_number}</p>
-                            )}
+                            <p className="text-sm"><strong>Name:</strong> {senderProfiles[proforma.user_id].full_name || 'N/A'}</p>
                             {senderProfiles[proforma.user_id].email && (
-                              <p className="text-xs text-muted-foreground">✉️ {senderProfiles[proforma.user_id].email}</p>
+                              <p className="text-xs"><strong>Email:</strong> {senderProfiles[proforma.user_id].email}</p>
+                            )}
+                            {senderProfiles[proforma.user_id].phone_number && (
+                              <p className="text-xs"><strong>Phone:</strong> {senderProfiles[proforma.user_id].phone_number}</p>
+                            )}
+                            {senderProfiles[proforma.user_id].company_name && (
+                              <p className="text-xs"><strong>Company:</strong> {senderProfiles[proforma.user_id].company_name}</p>
                             )}
                             {senderProfiles[proforma.user_id].tin_number && (
-                              <p className="text-xs font-semibold text-green-700 mt-1">🏛️ TIN: {senderProfiles[proforma.user_id].tin_number}</p>
+                              <p className="text-xs"><strong>TIN:</strong> {senderProfiles[proforma.user_id].tin_number}</p>
                             )}
                           </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Sender information loading...</p>
                         )}
                       </div>
                       

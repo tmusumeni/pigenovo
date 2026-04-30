@@ -30,6 +30,8 @@ interface Invoice {
   discount_amount?: number;
   total_amount?: number;
   created_at: string;
+  stamp_url?: string;
+  stamp_uploaded_at?: string;
 }
 
 interface InvoiceItem {
@@ -50,6 +52,10 @@ export function Invoices() {
   const [searchTerm, setSearchTerm] = useState('');
   const [walletBalance, setWalletBalance] = useState(0);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [stampFile, setStampFile] = useState<File | null>(null);
+  const [stampPreview, setStampPreview] = useState<string | null>(null);
+  const [stampUploading, setStampUploading] = useState(false);
+  const [currentStampUrl, setCurrentStampUrl] = useState<string | null>(null);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -83,6 +89,80 @@ export function Invoices() {
     fetchInvoices();
     fetchWalletBalance();
   }, []);
+
+  const handleStampFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+      
+      setStampFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setStampPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadStamp = async (invoiceId: string) => {
+    if (!stampFile) return null;
+    
+    try {
+      setStampUploading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      
+      const fileExt = stampFile.name.split('.').pop();
+      const fileName = `stamps/${user.id}/${invoiceId}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('proforma-stamps')
+        .upload(fileName, stampFile);
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('proforma-stamps')
+        .getPublicUrl(fileName);
+      
+      // Update invoice with stamp URL
+      const { error: updateError } = await supabase
+        .from('invoices')
+        .update({
+          stamp_url: publicUrl,
+          stamp_uploaded_at: new Date().toISOString()
+        })
+        .eq('id', invoiceId);
+      
+      if (updateError) throw updateError;
+      
+      setCurrentStampUrl(publicUrl);
+      setStampFile(null);
+      setStampPreview(null);
+      toast.success('Stamp uploaded successfully');
+      await fetchInvoices();
+      return publicUrl;
+    } catch (error: any) {
+      console.error('Error uploading stamp:', error);
+      toast.error('Failed to upload stamp');
+      return null;
+    } finally {
+      setStampUploading(false);
+    }
+  };
 
   const generateNextInvoiceNumber = async () => {
     try {
@@ -146,12 +226,19 @@ export function Invoices() {
       // Build sender profile section
       const senderSection = userProfile ? `
         <div class="sender-info">
-          <div class="sender-label">From:</div>
-          <p class="sender-name">${userProfile.full_name || 'N/A'}</p>
-          ${userProfile.company_name ? `<p class="sender-company"><strong>Company:</strong> ${userProfile.company_name}</p>` : ''}
-          ${userProfile.phone_number ? `<p class="sender-phone">📱 ${userProfile.phone_number}</p>` : ''}
-          ${userProfile.email ? `<p class="sender-email">✉️ ${userProfile.email}</p>` : ''}
-          ${userProfile.tin_number ? `<p class="sender-tin"><strong>TIN:</strong> ${userProfile.tin_number}</p>` : ''}
+          <div class="sender-label">📤 FROM (Sender Information)</div>
+          <p class="sender-field"><strong>Name:</strong> ${userProfile.full_name || 'N/A'}</p>
+          ${userProfile.email ? `<p class="sender-field"><strong>Email:</strong> ${userProfile.email}</p>` : ''}
+          ${userProfile.phone_number ? `<p class="sender-field"><strong>Phone:</strong> ${userProfile.phone_number}</p>` : ''}
+          ${userProfile.company_name ? `<p class="sender-field"><strong>Company:</strong> ${userProfile.company_name}</p>` : ''}
+          ${userProfile.tin_number ? `<p class="sender-field"><strong>TIN:</strong> ${userProfile.tin_number}</p>` : ''}
+        </div>
+      ` : '';
+
+      // Build stamp section if available
+      const stampSection = invoice.stamp_url ? `
+        <div class="stamp-section">
+          <img src="${invoice.stamp_url}" alt="Stamp" class="stamp-image" />
         </div>
       ` : '';
 
@@ -202,6 +289,20 @@ export function Invoices() {
               margin-top: 5px;
               color: #666;
             }
+            .stamp-section {
+              flex-shrink: 0;
+              text-align: center;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .stamp-image {
+              max-width: 120px;
+              max-height: 120px;
+              border: 1px solid #ddd;
+              border-radius: 5px;
+              padding: 3px;
+            }
             .sender-info {
               flex: 1;
               background: #f9f9f9;
@@ -214,14 +315,14 @@ export function Invoices() {
               font-size: 13px;
               margin-bottom: 8px;
             }
-            .sender-name {
-              font-weight: bold;
-              font-size: 13px;
-              margin-bottom: 3px;
-            }
-            .sender-company, .sender-phone, .sender-email, .sender-tin {
-              margin: 2px 0;
+            .sender-field {
+              margin: 3px 0;
               font-size: 11px;
+              line-height: 1.4;
+            }
+            .sender-field strong {
+              font-weight: 600;
+              color: #1a5490;
             }
             .header-section {
               margin-bottom: 30px;
@@ -324,7 +425,7 @@ export function Invoices() {
         </head>
         <body>
           <div class="document-container">
-            <!-- Top Bar with Logo, QR, and Sender -->
+            <!-- Top Bar with Logo, QR, Stamp and Sender -->
             <div class="top-bar">
               <div class="logo-section">
                 <img src="${logoUrl}" alt="PiGenovo Logo" />
@@ -333,6 +434,7 @@ export function Invoices() {
                 <img src="${qrCodeDataUrl}" alt="QR Code" />
                 <div class="qr-label">Scan to view</div>
               </div>
+              ${stampSection}
               ${senderSection}
             </div>
 
