@@ -2295,36 +2295,73 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Sender Profile Section */}
-              {userProfile && (
-                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-3">📤 FROM (Sender Information)</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Name</p>
-                      <p className="font-semibold text-sm">{userProfile.full_name || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="font-semibold text-sm">{userProfile.email || 'N/A'}</p>
-                    </div>
-                    {userProfile.company_name && (
+              {/* Show sender info based on whether this is a received or own proforma */}
+              {previewProforma.user_id !== currentUser?.id ? (
+                /* Received proforma - show actual sender info */
+                senderProfiles[previewProforma.user_id] && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-3">📤 FROM (Sender Information)</p>
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <p className="text-xs text-muted-foreground">Company</p>
-                        <p className="font-semibold text-sm">{userProfile.company_name}</p>
+                        <p className="text-xs text-muted-foreground">Name</p>
+                        <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].full_name || 'N/A'}</p>
                       </div>
-                    )}
-                    <div>
-                      <p className="text-xs text-muted-foreground">Phone</p>
-                      <p className="font-semibold text-sm">{userProfile.phone_number || 'N/A'}</p>
-                    </div>
-                    {userProfile.tin_number && (
                       <div>
-                        <p className="text-xs text-muted-foreground">TIN</p>
-                        <p className="font-semibold text-sm">{userProfile.tin_number}</p>
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].email || 'N/A'}</p>
                       </div>
-                    )}
+                      {senderProfiles[previewProforma.user_id].company_name && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Company</p>
+                          <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].company_name}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].phone_number || 'N/A'}</p>
+                      </div>
+                      {senderProfiles[previewProforma.user_id].tin_number && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">TIN</p>
+                          <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].tin_number}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )
+              ) : (
+                /* Own proforma - show our user profile */
+                userProfile && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-3">📤 FROM (Sender Information)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Name</p>
+                        <p className="font-semibold text-sm">{userProfile.full_name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="font-semibold text-sm">{userProfile.email || 'N/A'}</p>
+                      </div>
+                      {userProfile.company_name && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Company</p>
+                          <p className="font-semibold text-sm">{userProfile.company_name}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <p className="font-semibold text-sm">{userProfile.phone_number || 'N/A'}</p>
+                      </div>
+                      {userProfile.tin_number && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">TIN</p>
+                          <p className="font-semibold text-sm">{userProfile.tin_number}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
               )}
 
               <div className="grid grid-cols-2 gap-4 pb-4 border-b">
