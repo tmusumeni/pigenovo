@@ -2450,10 +2450,35 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <Button variant="outline" onClick={() => setShowPreview(false)} className="w-full mt-4">
                 Close
               </Button>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+
+              {/* Accept/Reject Buttons for Received Proformas */}
+              {previewProforma.user_id !== currentUser?.id && previewProforma.status === 'sent' && (
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    onClick={() => {
+                      handleAcceptProforma(previewProforma);
+                      setShowPreview(false);
+                    }}
+                    disabled={loading}
+                    className="flex-1 gap-2 bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Accept Proforma
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      handleRejectProforma(previewProforma);
+                      setShowPreview(false);
+                    }}
+                    disabled={loading}
+                    variant="outline"
+                    className="flex-1 gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Reject Proforma
+                  </Button>
+                </div>
+              )}
 
       {/* Edit Modal - WITH TABS */}
       {showEdit && editProforma && (
