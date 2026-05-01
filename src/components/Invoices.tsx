@@ -75,12 +75,15 @@ export function Invoices() {
       const { data: { user } } = await supabase.auth.getUser();
       // Fetch user profile with TIN
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
-        if (profile) {
+          .maybeSingle(); // Use maybeSingle to handle case where profile doesn't exist yet
+        
+        if (error) {
+          console.error('Error fetching user profile:', error);
+        } else if (profile) {
           setUserProfile(profile);
         }
       }
@@ -625,13 +628,15 @@ export function Invoices() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('wallets')
         .select('balance')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle to handle case where wallet doesn't exist yet
 
-      if (data) {
+      if (error) {
+        console.error('Error fetching wallet:', error);
+      } else if (data) {
         setWalletBalance(Number(data.balance));
       }
     } catch (error) {

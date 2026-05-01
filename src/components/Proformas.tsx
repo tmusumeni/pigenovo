@@ -111,12 +111,15 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       
       // Fetch user profile with TIN
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
-        if (profile) {
+          .maybeSingle(); // Use maybeSingle to handle case where profile doesn't exist yet
+        
+        if (error) {
+          console.error('Error fetching user profile:', error);
+        } else if (profile) {
           setUserProfile(profile);
         }
       }
@@ -292,10 +295,15 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid error when no profile exists
 
       if (error) {
         console.error('Error fetching sender profile:', error);
+        return null;
+      }
+
+      if (!profile) {
+        console.warn('No profile found for user:', userId);
         return null;
       }
 
