@@ -832,6 +832,83 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
+  const convertProformaToInvoice = async (proforma: ProformaWithItems) => {
+    try {
+      setLoading(true);
+      if (!currentUser?.id) {
+        toast.error('User not authenticated');
+        return;
+      }
+
+      // Create invoice from accepted proforma
+      const { data: newInvoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert([{
+          number: `INV-${proforma.number.replace('PRO-', '')}`, // Convert proforma number to invoice number
+          client_name: proforma.client_name,
+          client_phone: proforma.client_phone,
+          client_email: proforma.client_email,
+          amount: proforma.amount,
+          currency: proforma.currency,
+          description: proforma.description || `Converted from Proforma #${proforma.number}`,
+          status: 'sent',
+          invoice_date: new Date().toISOString(),
+          due_date: proforma.valid_until,
+          user_id: currentUser.id,
+          tax_rate: proforma.tax_rate || 0,
+          discount_rate: proforma.discount_rate || 0,
+          tax_amount: proforma.tax_amount || 0,
+          discount_amount: proforma.discount_amount || 0,
+          total_amount: proforma.total_amount || proforma.amount,
+          stamp_url: proforma.stamp_url,
+          stamp_uploaded_at: proforma.stamp_uploaded_at,
+        }])
+        .select();
+
+      if (invoiceError) throw invoiceError;
+      if (!newInvoice || newInvoice.length === 0) {
+        throw new Error('Failed to create invoice');
+      }
+
+      const invoiceId = newInvoice[0].id;
+
+      // Copy invoice items from proforma items
+      if (proforma.proforma_items && proforma.proforma_items.length > 0) {
+        const invoiceItems = proforma.proforma_items.map(item => ({
+          invoice_id: invoiceId,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('invoice_items')
+          .insert(invoiceItems);
+
+        if (itemsError) throw itemsError;
+      }
+
+      // Update proforma status to 'converted'
+      const { error: updateError } = await supabase
+        .from('proformas')
+        .update({ status: 'converted' })
+        .eq('id', proforma.id);
+
+      if (updateError) throw updateError;
+
+      toast.success(`✅ Proforma converted to Invoice #${newInvoice[0].number}`);
+      setShowPreview(false);
+      fetchProformas();
+      fetchReceivedProformas();
+      // Switch to Invoices tab
+      setActiveTab('invoices');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to convert proforma to invoice');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteProforma = async (id: string) => {
     if (!confirm(t('common.delete'))) return;
 
@@ -2557,6 +2634,18 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                     Reject Proforma
                   </Button>
                 </div>
+              )}
+
+              {/* Convert to Invoice Button for Accepted Proformas (Sender) */}
+              {previewProforma.user_id === currentUser?.id && previewProforma.status === 'accepted' && (
+                <Button
+                  onClick={() => convertProformaToInvoice(previewProforma)}
+                  disabled={loading}
+                  className="w-full mt-4 gap-2 bg-blue-600 hover:bg-blue-700"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  Convert to Invoice
+                </Button>
               )}
 
       {/* Edit Modal - WITH TABS */}
