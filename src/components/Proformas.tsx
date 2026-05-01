@@ -330,8 +330,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       if (error) throw error;
       
-      console.log('Fetched proformas, first proforma:', data?.[0]); // Debug log
-      console.log('Stamp URL in first proforma:', data?.[0]?.stamp_url); // Debug log
+      console.log('Fetched proformas, count:', data?.length); // Debug log
+      if (data && data.length > 0) {
+        console.log('First proforma structure:', Object.keys(data[0])); // Show all fields
+        console.log('Stamp URL in first proforma:', data[0]?.stamp_url); // Debug log
+        console.log('Stamp uploaded at:', data[0]?.stamp_uploaded_at); // Debug log
+      }
       
       // Ensure all proformas have all required fields with defaults
       const processedData = (data || []).map((proforma: any) => {
@@ -2524,7 +2528,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               )}
 
               {/* Stamp Display */}
-              {previewProforma.stamp_url && (
+              {previewProforma.stamp_url ? (
                 <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border border-amber-200 dark:border-amber-800 dark:bg-gradient-to-br dark:from-amber-950 dark:to-orange-950">
                   <p className="text-xs font-bold text-amber-700 dark:text-amber-300 mb-3">🔖 STAMP/LOGO</p>
                   <div className="flex justify-center">
@@ -2533,11 +2537,18 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       alt="Stamp" 
                       className="max-w-[150px] max-h-[150px] rounded-md border border-amber-300 dark:border-amber-700 shadow-sm"
                       onError={(e) => {
-                        console.error('Error loading stamp:', e);
+                        console.error('Error loading stamp from URL:', previewProforma.stamp_url);
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
                   </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+                    {previewProforma.stamp_uploaded_at && `Uploaded: ${new Date(previewProforma.stamp_uploaded_at).toLocaleDateString()}`}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                  <p className="text-xs text-gray-500">🔖 No stamp/logo uploaded yet</p>
                 </div>
               )}
 
