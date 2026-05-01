@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Mail, Phone, MapPin, Facebook, Twitter, Linkedin } from 'lucide-react';
+import { Heart, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Youtube } from 'lucide-react';
 import logoImage from '@/assets/images/logo.png';
 import { useLanguage } from '@/lib/LanguageContext';
 
@@ -23,7 +23,7 @@ export function Footer() {
               <span className="font-bold text-lg">PiGenovo</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              A comprehensive platform for trading, earning, and managing your financial transactions seamlessly.
+              A comprehensive platform for trading, earning, proformas, invoices and managing your financial transactions seamlessly.
             </p>
             <div className="flex gap-3 pt-2">
               <a href="#" className="p-2 bg-muted rounded-lg hover:bg-primary/10 transition">
@@ -31,6 +31,9 @@ export function Footer() {
               </a>
               <a href="#" className="p-2 bg-muted rounded-lg hover:bg-primary/10 transition">
                 <Twitter className="h-4 w-4" />
+              </a>
+               <a href="#" className="p-2 bg-muted rounded-lg hover:bg-primary/10 transition">
+                <Youtube className="h-4 w-4" />
               </a>
               <a href="#" className="p-2 bg-muted rounded-lg hover:bg-primary/10 transition">
                 <Linkedin className="h-4 w-4" />
@@ -72,8 +75,8 @@ export function Footer() {
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4 flex-shrink-0" />
-                <a href="tel:+250788838601" className="hover:text-primary transition">
-                  +250 (0) 788 838 601
+                <a href="tel:+250788984216" className="hover:text-primary transition">
+                  +250 788984216
                 </a>
               </li>
               <li className="flex items-start gap-2">
