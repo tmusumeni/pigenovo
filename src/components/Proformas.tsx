@@ -219,6 +219,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         .from('proforma-stamps')
         .getPublicUrl(fileName);
       
+      console.log('Stamp public URL:', publicUrl); // Debug log
+      
       // Update proforma with stamp URL
       const { error: updateError } = await supabase
         .from('proformas')
@@ -227,13 +229,18 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           stamp_uploaded_at: new Date().toISOString()
         })
         .eq('id', proformaId);
+
+      if (updateError) {
+        console.error('Error updating stamp_url:', updateError);
+        throw updateError;
+      }
       
-      if (updateError) throw updateError;
+      console.log('Stamp saved successfully for proforma:', proformaId); // Debug log
       
       setCurrentStampUrl(publicUrl);
       setStampFile(null);
       setStampPreview(null);
-      toast.success('Stamp uploaded successfully');
+      toast.success('✅ Stamp uploaded successfully');
       await fetchProformas();
       return publicUrl;
     } catch (error: any) {
@@ -314,6 +321,9 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('Fetched proformas, first proforma:', data?.[0]); // Debug log
+      console.log('Stamp URL in first proforma:', data?.[0]?.stamp_url); // Debug log
       
       // Ensure all proformas have all required fields with defaults
       const processedData = (data || []).map((proforma: any) => {
@@ -464,6 +474,9 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   };
 
   const handlePreviewReceivedProforma = async (proforma: any) => {
+    console.log('Preview proforma:', proforma); // Debug log
+    console.log('Stamp URL:', proforma.stamp_url); // Debug log
+    
     // Load items for this proforma
     const items = await loadProformaItems(proforma.id);
     
