@@ -393,9 +393,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           discount_amount: amount * (discountRate / 100),
           total_amount: totalAmount,
           // For received proformas, show 'sent' status unless already accepted/rejected
-          status: proforma.recipient_status === 'accepted' || proforma.recipient_status === 'rejected' 
-            ? proforma.recipient_status 
-            : 'sent',
+          // Force 'sent' status for all pending received proformas
+          status: proforma.recipient_status === 'accepted' 
+            ? 'accepted' 
+            : proforma.recipient_status === 'rejected' 
+            ? 'rejected' 
+            : 'sent', // Default to 'sent' for all other statuses (pending, draft, etc)
           user_id: proforma.user_id,
           sent_date: proforma.sent_date,
           viewed_date: proforma.viewed_date,
