@@ -93,7 +93,7 @@ export function Footer() {
         {/* Bottom Footer */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <p className="flex items-center gap-1">
-            Made with <Heart className="h-4 w-4 text-red-500" /> by PiGenovo Team © {currentYear}
+            Made with Gisenyihits <Heart className="h-4 w-4 text-red-500" /> by PiGenovo Team © {currentYear}
           </p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-primary transition">Privacy Policy</a>

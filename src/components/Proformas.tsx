@@ -392,7 +392,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           tax_amount: taxAmount,
           discount_amount: amount * (discountRate / 100),
           total_amount: totalAmount,
-          status: proforma.status,
+          // For received proformas, show 'sent' status unless already accepted/rejected
+          status: proforma.recipient_status === 'accepted' || proforma.recipient_status === 'rejected' 
+            ? proforma.recipient_status 
+            : 'sent',
           user_id: proforma.user_id,
           sent_date: proforma.sent_date,
           viewed_date: proforma.viewed_date,
