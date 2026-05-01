@@ -2257,7 +2257,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       Preview
                     </Button>
 
-                    {proforma.status === 'sent' && (
+                    {/* Show accept/reject for received proformas that haven't been accepted or rejected */}
+                    {proforma.user_id !== currentUser?.id && proforma.status !== 'accepted' && proforma.status !== 'rejected' && (
                       <>
                         <Button
                           size="sm"
@@ -2506,7 +2507,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               </Button>
 
               {/* Accept/Reject Buttons for Received Proformas */}
-              {previewProforma.user_id !== currentUser?.id && previewProforma.status === 'sent' && (
+              {previewProforma.user_id !== currentUser?.id && previewProforma.status !== 'accepted' && previewProforma.status !== 'rejected' && (
                 <div className="flex gap-2 mt-4">
                   <Button
                     onClick={() => {
