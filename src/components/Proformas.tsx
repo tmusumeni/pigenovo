@@ -2400,6 +2400,24 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 )
               )}
 
+              {/* Stamp Display */}
+              {previewProforma.stamp_url && (
+                <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border border-amber-200 dark:border-amber-800 dark:bg-gradient-to-br dark:from-amber-950 dark:to-orange-950">
+                  <p className="text-xs font-bold text-amber-700 dark:text-amber-300 mb-3">🔖 STAMP/LOGO</p>
+                  <div className="flex justify-center">
+                    <img 
+                      src={previewProforma.stamp_url} 
+                      alt="Stamp" 
+                      className="max-w-[150px] max-h-[150px] rounded-md border border-amber-300 dark:border-amber-700 shadow-sm"
+                      onError={(e) => {
+                        console.error('Error loading stamp:', e);
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 pb-4 border-b">
                 <div>
                   <p className="text-xs text-muted-foreground">Client</p>
