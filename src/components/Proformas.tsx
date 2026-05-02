@@ -426,6 +426,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           viewed_date: proforma.viewed_date,
           recipient_status: proforma.recipient_status,
           created_at: proforma.created_at,
+          stamp_url: proforma.stamp_url, // Include stamp
+          stamp_uploaded_at: proforma.stamp_uploaded_at, // Include stamp upload time
           proforma_items: [] // Will load separately if needed
         };
       });
