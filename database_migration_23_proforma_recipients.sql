@@ -41,7 +41,8 @@ ALTER TABLE public.proforma_recipients ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist
 DROP POLICY IF EXISTS "Users can view their received proformas" ON public.proforma_recipients;
-DROP POLICY IF EXISTS "Senders can view their sent proformas recipients" ON public.proforma_recipients;
+-- NOTE: Removed DROP POLICY for "Senders can view their sent proformas recipients"
+-- as this policy causes circular recursion and is not needed
 DROP POLICY IF EXISTS "RPC functions can insert recipients" ON public.proforma_recipients;
 DROP POLICY IF EXISTS "RPC functions can update recipients" ON public.proforma_recipients;
 
@@ -51,17 +52,9 @@ CREATE POLICY "Users can view their received proformas"
   FOR SELECT
   USING (auth.uid() = receiver_user_id);
 
--- Allow senders to view who they sent proformas to (for tracking)
-CREATE POLICY "Senders can view their sent proformas recipients"
-  ON public.proforma_recipients
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.proformas
-      WHERE proformas.id = proforma_recipients.proforma_id
-      AND proformas.user_id = auth.uid()
-    )
-  );
+-- NOTE: Removed "Senders can view their sent proformas recipients" policy
+-- to prevent circular recursion. Senders can see their proformas via the
+-- proformas table RLS policies directly.
 
 -- Allow RPC functions to insert (with SECURITY DEFINER, this won't be used but kept for clarity)
 CREATE POLICY "RPC functions can insert recipients"
