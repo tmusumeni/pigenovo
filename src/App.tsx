@@ -3,9 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import { Auth } from '@/components/Auth';
 import { Dashboard } from '@/components/Dashboard';
-import { FooterTest } from '@/pages/FooterTest';
-import { PublicProformaView } from '@/components/PublicProformaView';
-import { PublicInvoiceView } from '@/components/PublicInvoiceView';
 import { LanguageProvider } from '@/lib/LanguageContext';
 import { Toaster } from '@/components/ui/sonner';
 import { Zap } from 'lucide-react';
@@ -53,11 +50,6 @@ export default function App() {
         <div className="min-h-screen bg-background selection:bg-primary/10 selection:text-primary">
           <AnimatePresence mode="wait">
             <Routes>
-              {/* Public Routes - No Authentication Required */}
-              <Route path="/share/proforma/:shareToken" element={<PublicProformaView />} />
-              <Route path="/share/invoice/:shareToken" element={<PublicInvoiceView />} />
-
-              {/* Protected Routes - Authentication Required */}
               <Route 
                 path="/login" 
                 element={
@@ -91,10 +83,6 @@ export default function App() {
                     <Navigate to="/login" replace />
                   )
                 } 
-              />
-              <Route 
-                path="/footer-test" 
-                element={<FooterTest />} 
               />
               <Route path="*" element={<Navigate to={session ? "/" : "/login"} replace />} />
             </Routes>

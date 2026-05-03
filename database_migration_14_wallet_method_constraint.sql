@@ -19,15 +19,11 @@ WHERE method IS NULL
      'wallet_payment',
      'invoice_payment',
      'export_fee',
-     'send_fee',
      'service_charge',
      'withdrawal',
      'deposit',
      'transfer',
-     'earnings_transfer',
-     'rwf_momo',
-     'pi_network',
-     'usdt'
+     'earnings_transfer'
    );
 
 -- Add comprehensive method constraint with all supported methods
@@ -38,20 +34,16 @@ CHECK (method IN (
   'wallet_payment',         -- Payment from one wallet to another
   'invoice_payment',        -- Payment for invoice converted from proforma
   'export_fee',             -- Fee for exporting proforma/invoice
-  'send_fee',               -- Fee for sending proforma to recipient
   'service_charge',         -- General service charges
   'withdrawal',             -- General withdrawal
   'deposit',                -- General deposit
   'transfer',               -- Internal transfer
-  'earnings_transfer',      -- Transfer from earnings wallet to main wallet
-  'rwf_momo',               -- Mobile money (MoMo) deposit/withdrawal in RWF
-  'pi_network',             -- Pi Network cryptocurrency
-  'usdt'                    -- USDT cryptocurrency
+  'earnings_transfer'       -- Transfer from earnings wallet to main wallet
 ));
 
 -- Add comment explaining all methods
 COMMENT ON CONSTRAINT wallet_transactions_method_check ON wallet_transactions 
-IS 'Payment methods: bank_transfer, wallet_payment, invoice_payment, export_fee, service_charge, withdrawal, deposit, transfer, earnings_transfer, rwf_momo, pi_network, usdt';
+IS 'Payment methods: bank_transfer, wallet_payment, invoice_payment, export_fee, service_charge, withdrawal, deposit, transfer, earnings_transfer';
 
 -- Create index on method for faster lookups
 CREATE INDEX IF NOT EXISTS idx_wallet_transactions_method ON wallet_transactions(method);

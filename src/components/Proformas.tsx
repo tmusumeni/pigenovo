@@ -25,13 +25,18 @@ interface Proforma {
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'converted';
   proforma_date: string;
   valid_until?: string;
-  user_id?: string;
+  tax_rate?: number;
+  discount_rate?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  total_amount?: number;
+  user_id: string;
   client_user_id?: string;
   sent_date?: string;
+  viewed_date?: string;
+  recipient_status?: string;
   viewed_by_client?: boolean;
   created_at: string;
-  stamp_url?: string;
-  stamp_uploaded_at?: string;
 }
 
 interface ProformaItem {
@@ -44,13 +49,6 @@ interface ProformaItem {
 
 interface ProformaWithItems extends Proforma {
   proforma_items?: ProformaItem[];
-  discount_rate?: number;
-  discount_amount?: number;
-  tax_rate?: number;
-  tax_amount?: number;
-  total_amount?: number;
-  stamp_url?: string;
-  stamp_uploaded_at?: string;
 }
 
 export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
@@ -69,19 +67,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [editProforma, setEditProforma] = useState<ProformaWithItems | null>(null);
   const [editLineItems, setEditLineItems] = useState<ProformaItem[]>([]);
   const [exportCharge, setExportCharge] = useState(1000);
-  const [sendCharge, setSendCharge] = useState(500);
   const [showSaveAfterExport, setShowSaveAfterExport] = useState(false);
   const [exportPendingProforma, setExportPendingProforma] = useState<ProformaWithItems | null>(null);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'image'>('pdf');
   const [lastNotifiedIds, setLastNotifiedIds] = useState<Set<string>>(new Set());
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [senderProfiles, setSenderProfiles] = useState<Record<string, any>>({});
-  const [stampFile, setStampFile] = useState<File | null>(null);
-  const [stampPreview, setStampPreview] = useState<string | null>(null);
-  const [stampUploading, setStampUploading] = useState(false);
-  const [currentStampUrl, setCurrentStampUrl] = useState<string | null>(null);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -108,26 +99,9 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
-      
-      // Fetch user profile with TIN
-      if (user) {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle(); // Use maybeSingle to handle case where profile doesn't exist yet
-        
-        if (error) {
-          console.error('Error fetching user profile:', error);
-        } else if (profile) {
-          setUserProfile(profile);
-        }
-      }
-      
       fetchProformas();
       fetchReceivedProformas();
       fetchExportCharge();
-      fetchSendCharge();
     };
     init();
 
@@ -138,123 +112,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
     return () => clearInterval(interval);
   }, []);
-
-  const handleStampFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
-        return;
-      }
-      
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('File size must be less than 5MB');
-        return;
-      }
-      
-      setStampFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setStampPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadStamp = async (proformaId: string) => {
-    if (!stampFile) return null;
-    
-    try {
-      setStampUploading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-      
-      const fileExt = stampFile.name.split('.').pop();
-      const fileName = `stamps/${user.id}/${proformaId}/${Date.now()}.${fileExt}`;
-      
-      // Try to upload - if bucket doesn't exist, create it
-      let uploadError: any = null;
-      
-      const uploadResult = await supabase.storage
-        .from('proforma-stamps')
-        .upload(fileName, stampFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      uploadError = uploadResult.error;
-      
-      // If bucket doesn't exist, create it and retry
-      if (uploadError?.message?.includes('Bucket not found') || uploadError?.message?.includes('bucket')) {
-        console.log('Creating proforma-stamps bucket...');
-        
-        // Attempt to create bucket via SQL
-        const { error: createBucketError } = await supabase
-          .rpc('create_bucket_if_not_exists', { 
-            bucket_name: 'proforma-stamps',
-            is_public: true 
-          });
-        
-        if (createBucketError) {
-          console.warn('Could not auto-create bucket via RPC, bucket must be created manually in Supabase dashboard');
-          throw new Error('Storage bucket "proforma-stamps" not found. Please create it in your Supabase dashboard (Storage > Create bucket > Name: proforma-stamps)');
-        }
-        
-        // Retry upload after bucket creation
-        const retryResult = await supabase.storage
-          .from('proforma-stamps')
-          .upload(fileName, stampFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
-        
-        if (retryResult.error) throw retryResult.error;
-      } else if (uploadError) {
-        throw uploadError;
-      }
-      
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('proforma-stamps')
-        .getPublicUrl(fileName);
-      
-      console.log('Stamp public URL:', publicUrl); // Debug log
-      
-      // Update proforma with stamp URL
-      const { error: updateError } = await supabase
-        .from('proformas')
-        .update({
-          stamp_url: publicUrl,
-          stamp_uploaded_at: new Date().toISOString()
-        })
-        .eq('id', proformaId);
-
-      if (updateError) {
-        console.error('Error updating stamp_url:', updateError);
-        throw updateError;
-      }
-      
-      console.log('Stamp saved successfully for proforma:', proformaId); // Debug log
-      
-      setCurrentStampUrl(publicUrl);
-      setStampFile(null);
-      setStampPreview(null);
-      toast.success('✅ Stamp uploaded successfully');
-      await fetchProformas();
-      return publicUrl;
-    } catch (error: any) {
-      console.error('Error uploading stamp:', error);
-      const errorMsg = error?.message || 'Failed to upload stamp';
-      toast.error(errorMsg);
-      return null;
-    } finally {
-      setStampUploading(false);
-    }
-  };
 
   const generateNextProformaNumber = async () => {
     try {
@@ -284,38 +141,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
-  const fetchSenderProfile = async (userId: string) => {
-    try {
-      // Check cache first
-      if (senderProfiles[userId]) {
-        return senderProfiles[userId];
-      }
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle(); // Use maybeSingle to avoid error when no profile exists
-
-      if (error) {
-        console.error('Error fetching sender profile:', error);
-        return null;
-      }
-
-      if (!profile) {
-        console.warn('No profile found for user:', userId);
-        return null;
-      }
-
-      // Cache the profile
-      setSenderProfiles(prev => ({ ...prev, [userId]: profile }));
-      return profile;
-    } catch (error) {
-      console.error('Error fetching sender profile:', error);
-      return null;
-    }
-  };
-
   const fetchProformas = async () => {
     try {
       setLoading(true);
@@ -330,15 +155,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       if (error) throw error;
       
-      console.log('Fetched proformas, count:', data?.length); // Debug log
-      if (data && data.length > 0) {
-        console.log('First proforma structure:', Object.keys(data[0])); // Show all fields
-        console.log('Stamp URL in first proforma:', data[0]?.stamp_url); // Debug log
-        console.log('Stamp uploaded at:', data[0]?.stamp_uploaded_at); // Debug log
-      }
-      
       // Ensure all proformas have all required fields with defaults
-      const processedData = (data || []).map((proforma: any) => {
+      const processedData = (data || []).map(proforma => {
         const subtotal = proforma.amount || 0;
         const discountAmount = proforma.discount_amount !== null && proforma.discount_amount !== undefined ? proforma.discount_amount : 0;
         const taxAmount = proforma.tax_amount !== null && proforma.tax_amount !== undefined ? proforma.tax_amount : 0;
@@ -388,7 +206,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       console.log('Raw data from RPC:', data);
       
       // Process data with all fields from RPC
-      const processedData = (data || []).map((proforma: any) => {
+      const processedData = (data || []).map((proforma: Partial<Proforma>) => {
         const amount = Number(proforma.amount) || 0;
         const taxRate = Number(proforma.tax_rate) || 0;
         const discountRate = Number(proforma.discount_rate) || 0;
@@ -414,41 +232,25 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           tax_amount: taxAmount,
           discount_amount: amount * (discountRate / 100),
           total_amount: totalAmount,
-          // For received proformas, show 'sent' status unless already accepted/rejected
-          // Force 'sent' status for all pending received proformas
-          status: proforma.recipient_status === 'accepted' 
-            ? 'accepted' 
-            : proforma.recipient_status === 'rejected' 
-            ? 'rejected' 
-            : 'sent', // Default to 'sent' for all other statuses (pending, draft, etc)
+          status: proforma.status,
           user_id: proforma.user_id,
           sent_date: proforma.sent_date,
           viewed_date: proforma.viewed_date,
           recipient_status: proforma.recipient_status,
           created_at: proforma.created_at,
-          stamp_url: proforma.stamp_url, // Include stamp
-          stamp_uploaded_at: proforma.stamp_uploaded_at, // Include stamp upload time
           proforma_items: [] // Will load separately if needed
         };
       });
       
       console.log('Processed data:', processedData);
       
-      // Fetch sender profiles for all proformas
-      const uniqueSenderIds = [...new Set(processedData.map((p: ProformaWithItems) => p.user_id).filter(Boolean))];
-      for (const senderId of uniqueSenderIds) {
-        if (senderId && !senderProfiles[senderId]) {
-          await fetchSenderProfile(senderId);
-        }
-      }
-      
       // ✨ DETECT AND NOTIFY ABOUT NEW PROFORMAS
       const newProformaIds = processedData
-        .filter((p: ProformaWithItems) => !lastNotifiedIds.has(p.id))
-        .map((p: ProformaWithItems) => p.id);
+        .filter(p => !lastNotifiedIds.has(p.id))
+        .map(p => p.id);
       
       if (newProformaIds.length > 0) {
-        const firstNew = processedData.find((p: ProformaWithItems) => newProformaIds.includes(p.id));
+        const firstNew = processedData.find(p => newProformaIds.includes(p.id));
         if (firstNew) {
           // Show in-app notification
           toast.success(
@@ -458,7 +260,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           
           // Update tracked IDs to prevent duplicate notifications
           const updatedIds = new Set(lastNotifiedIds);
-          newProformaIds.forEach((id: string) => updatedIds.add(id));
+          newProformaIds.forEach(id => updatedIds.add(id));
           setLastNotifiedIds(updatedIds);
         }
       }
@@ -487,10 +289,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
-  const handlePreviewReceivedProforma = async (proforma: any) => {
-    console.log('Preview proforma:', proforma); // Debug log
-    console.log('Stamp URL:', proforma.stamp_url); // Debug log
-    
+  const handlePreviewReceivedProforma = async (proforma: Proforma) => {
     // Load items for this proforma
     const items = await loadProformaItems(proforma.id);
     
@@ -590,7 +389,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       // After proforma is created, update with tax/discount values (always save these)
       // This will succeed if migrations have been run
-      const updateData: any = {
+      const updateData: Partial<Proforma> = {
         tax_rate: formData.tax_rate || 0,
         discount_rate: formData.discount_rate || 0,
         tax_amount: totals.taxAmount,
@@ -625,11 +424,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
       if (itemsError) throw itemsError;
       
-      // Upload stamp if one was selected
-      if (stampFile) {
-        await uploadStamp(proformaData.id);
-      }
-      
       toast.success(`✅ ${proformaData.number} created successfully`);
       setFormData({
         number: '',
@@ -643,7 +437,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         discount_rate: 0,
       });
       setLineItems([]);
-      setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
+      setCurrentItem({ description: '', quantity: 1, unit_price: 0 } as ProformaItem);
       setShowNew(false);
       fetchProformas();
     } catch (error: any) {
@@ -689,27 +483,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check wallet balance before sending
-      const { data: wallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (walletError || !wallet) {
-        toast.error('Unable to check wallet balance');
-        setLoading(false);
-        return;
-      }
-
-      // Check if balance is sufficient for send charge
-      if (wallet.balance < sendCharge) {
-        toast.error(`Insufficient wallet balance. Need ${sendCharge} RWF to send proforma`);
-        toast.info(`Current balance: ${wallet.balance} RWF`);
-        setLoading(false);
-        return;
-      }
-
       // Use RPC function to send proforma to receiver (NEW VERSION)
       const { data, error } = await supabase.rpc('send_proforma_to_receiver_v2', {
         p_proforma_id: proforma.id,
@@ -721,32 +494,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       if (!data || !data.success) {
         throw new Error(data?.error || 'Failed to send proforma');
       }
-
-      // Deduct charge from wallet
-      const { error: updateError } = await supabase
-        .from('wallets')
-        .update({ balance: wallet.balance - sendCharge })
-        .eq('user_id', user.id);
-
-      if (updateError) throw updateError;
-
-      // Record transaction
-      const { error: transError } = await supabase
-        .from('wallet_transactions')
-        .insert([{
-          user_id: user.id,
-          type: 'withdrawal',
-          method: 'send_fee',
-          amount: sendCharge,
-          currency: 'RWF',
-          status: 'approved',
-          details: { proforma_id: proforma.id, description: `Proforma ${proforma.number} send to ${proforma.client_email}`, fee_type: 'proforma_send' }
-        }]);
-
-      if (transError) throw transError;
-
+      
       toast.success(`✅ Proforma sent to ${proforma.client_email}`);
-      toast.info(`💳 Send charge of ${sendCharge} RWF deducted from your wallet`);
       
       // Reset search and switch to My Proformas tab to show updated status
       setSearchTerm('');
@@ -767,8 +516,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         toast.info('💡 Receiver must be registered in the system first');
       } else if (errorMsg.includes('already sent')) {
         toast.info('This proforma has already been sent');
-      } else if (errorMsg.includes('wallet')) {
-        toast.info('💳 Wallet balance issue - try topping up your wallet');
       }
     } finally {
       setLoading(false);
@@ -859,83 +606,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
-  const convertProformaToInvoice = async (proforma: ProformaWithItems) => {
-    try {
-      setLoading(true);
-      if (!currentUser?.id) {
-        toast.error('User not authenticated');
-        return;
-      }
-
-      // Create invoice from accepted proforma
-      const { data: newInvoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert([{
-          number: `INV-${proforma.number.replace('PRO-', '')}`, // Convert proforma number to invoice number
-          client_name: proforma.client_name,
-          client_phone: proforma.client_phone,
-          client_email: proforma.client_email,
-          amount: proforma.amount,
-          currency: proforma.currency,
-          description: proforma.description || `Converted from Proforma #${proforma.number}`,
-          status: 'sent',
-          invoice_date: new Date().toISOString(),
-          due_date: proforma.valid_until,
-          user_id: currentUser.id,
-          tax_rate: proforma.tax_rate || 0,
-          discount_rate: proforma.discount_rate || 0,
-          tax_amount: proforma.tax_amount || 0,
-          discount_amount: proforma.discount_amount || 0,
-          total_amount: proforma.total_amount || proforma.amount,
-          stamp_url: proforma.stamp_url,
-          stamp_uploaded_at: proforma.stamp_uploaded_at,
-        }])
-        .select();
-
-      if (invoiceError) throw invoiceError;
-      if (!newInvoice || newInvoice.length === 0) {
-        throw new Error('Failed to create invoice');
-      }
-
-      const invoiceId = newInvoice[0].id;
-
-      // Copy invoice items from proforma items
-      if (proforma.proforma_items && proforma.proforma_items.length > 0) {
-        const invoiceItems = proforma.proforma_items.map(item => ({
-          invoice_id: invoiceId,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('invoice_items')
-          .insert(invoiceItems);
-
-        if (itemsError) throw itemsError;
-      }
-
-      // Update proforma status to 'converted'
-      const { error: updateError } = await supabase
-        .from('proformas')
-        .update({ status: 'converted' })
-        .eq('id', proforma.id);
-
-      if (updateError) throw updateError;
-
-      toast.success(`✅ Proforma converted to Invoice #${newInvoice[0].number}`);
-      setShowPreview(false);
-      fetchProformas();
-      fetchReceivedProformas();
-      // Switch to Invoices tab
-      setActiveTab('invoices');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to convert proforma to invoice');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeleteProforma = async (id: string) => {
     if (!confirm(t('common.delete'))) return;
 
@@ -962,8 +632,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       toast.error('Please fill all item fields');
       return;
     }
-    setLineItems([...lineItems, { ...currentItem }]);
-    setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
+    setLineItems([...lineItems, { ...currentItem } as ProformaItem]);
+    setCurrentItem({ description: '', quantity: 1, unit_price: 0 } as ProformaItem);
   };
 
   const handleRemoveLineItem = (index: number) => {
@@ -990,8 +660,25 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     };
   };
 
+  const resetForm = () => {
+    setFormData({
+      number: '',
+      client_name: '',
+      client_phone: '',
+      client_email: '',
+      currency: 'RWF',
+      description: '',
+      valid_until: '',
+      tax_rate: 0,
+      discount_rate: 0,
+    });
+    setLineItems([]);
+    setCurrentItem({ description: '', quantity: 1, unit_price: 0 } as ProformaItem);
+    setSelectedCustomer(null);
+  };
+
   // Helper function to calculate totals from a proforma object
-  const calculateProformaTotal = (proforma: any) => {
+  const calculateProformaTotal = (proforma: Proforma) => {
     const subtotal = proforma.amount || 0;
     const discountAmount = proforma.discount_amount || 0;
     const taxAmount = proforma.tax_amount || 0;
@@ -1009,55 +696,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
   const fetchExportCharge = async () => {
     try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('id', 'proforma_export_charge')
-        .single();
-
-      if (error) {
-        console.log('Export charge not found, initializing with default 1000');
-        const { error: insertError } = await supabase
-          .from('settings')
-          .insert({
-            id: 'proforma_export_charge',
-            value: { charge: 1000 }
-          });
-        if (insertError) console.error('Error initializing export charge:', insertError);
-        setExportCharge(1000);
-      } else if (data) {
-        setExportCharge(data.value?.charge || 1000);
+      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
+      if (data) {
+        setExportCharge(data.value.charge || 1000);
       }
     } catch (error) {
-      console.error('Error fetching export charge:', error);
-      setExportCharge(1000);
-    }
-  };
-
-  const fetchSendCharge = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('id', 'proforma_send_charge')
-        .single();
-
-      if (error) {
-        console.log('Send charge not found, initializing with default 500');
-        const { error: insertError } = await supabase
-          .from('settings')
-          .insert({
-            id: 'proforma_send_charge',
-            value: { charge: 500 }
-          });
-        if (insertError) console.error('Error initializing send charge:', insertError);
-        setSendCharge(500);
-      } else if (data) {
-        setSendCharge(data.value?.charge || 500);
-      }
-    } catch (error) {
-      console.error('Error fetching send charge:', error);
-      setSendCharge(500);
+      setExportCharge(1000); // Default charge
     }
   };
 
@@ -1071,7 +715,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     if (!items || items.length === 0) return [];
     
     const uniqueItems: ProformaItem[] = [];
-    items.forEach((item: ProformaItem) => {
+    items.forEach(item => {
       const isDuplicate = uniqueItems.some(u => 
         u.description === item.description && 
         u.quantity === item.quantity && 
@@ -1094,7 +738,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         const uniqueItems: ProformaItem[] = [];
         const duplicateIds: string[] = [];
         
-        itemsToEdit.forEach((item: ProformaItem) => {
+        itemsToEdit.forEach(item => {
           const isDuplicate = uniqueItems.some(u => 
             u.description === item.description && 
             u.quantity === item.quantity && 
@@ -1159,7 +803,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       
       editLineItems.forEach((item: ProformaItem) => {
         const key = `${item.description}|${item.quantity}|${item.unit_price}`;
-        const isDuplicate = uniqueItems.some(u => 
+        const isDuplicate = uniqueItems.some((u: ProformaItem) => 
           u.description === item.description && 
           u.quantity === item.quantity && 
           u.unit_price === item.unit_price
@@ -1319,14 +963,14 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
-  const handleSaveAfterExport = async (action: 'preview' | 'download') => {
+  const handleSaveAfterExport = (action: 'preview' | 'download') => {
     if (!exportPendingProforma) return;
     
     if (action === 'preview') {
       setPreviewProforma(exportPendingProforma);
       setShowPreview(true);
     } else {
-      await generateProformaDocument(exportPendingProforma, exportFormat);
+      generateProformaDocument(exportPendingProforma, exportFormat);
       toast.success(`✅ Proforma exported as ${exportFormat.toUpperCase()}`);
     }
     
@@ -1334,382 +978,115 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setExportPendingProforma(null);
   };
 
-  const resetForm = () => {
-    setFormData({
-      number: '',
-      client_name: '',
-      client_phone: '',
-      client_email: '',
-      currency: 'RWF',
-      description: '',
-      valid_until: '',
-      tax_rate: 0,
-      discount_rate: 0,
-    });
-    setLineItems([]);
-    setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
-    setShowNew(false);
-  };
-
-  const generateProformaDocument = async (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
-    try {
-      // Dynamically import qrcode
-      const QRCode = (await import('qrcode')).default;
-      
-      // Generate QR code for proforma link
-      const proformaUrl = `${window.location.origin}/#/proforma/${proforma.id}`;
-      const qrCodeDataUrl = await QRCode.toDataURL(proformaUrl, {
-        errorCorrectionLevel: 'H',
-        type: 'image/png',
-        width: 150,
-        margin: 1,
-      });
-
-      // Logo URL (from public assets) - use absolute URL for exports
-      const logoUrl = `${window.location.origin}/logo.png`;
-
-      // Build sender profile section
-      const senderSection = userProfile ? `
-        <div class="sender-info">
-          <div class="sender-label">📤 FROM (Sender Information)</div>
-          <p class="sender-field"><strong>Name:</strong> ${userProfile.full_name || 'N/A'}</p>
-          ${userProfile.email ? `<p class="sender-field"><strong>Email:</strong> ${userProfile.email}</p>` : ''}
-          ${userProfile.phone_number ? `<p class="sender-field"><strong>Phone:</strong> ${userProfile.phone_number}</p>` : ''}
-          ${userProfile.company_name ? `<p class="sender-field"><strong>Company:</strong> ${userProfile.company_name}</p>` : ''}
-          ${userProfile.tin_number ? `<p class="sender-field"><strong>TIN:</strong> ${userProfile.tin_number}</p>` : ''}
+  const generateProformaDocument = (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
+    // Generate HTML content
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+          .title { font-size: 24px; font-weight: bold; }
+          .subtitle { font-size: 14px; color: #666; }
+          .section { margin-bottom: 20px; }
+          .label { font-weight: bold; margin-top: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { background: #f0f0f0; padding: 8px; text-align: left; border: 1px solid #ddd; }
+          td { padding: 8px; border: 1px solid #ddd; }
+          .total { font-weight: bold; background: #f9f9f9; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">PROFORMA INVOICE</div>
+          <div class="subtitle">Reference: ${proforma.number}</div>
         </div>
-      ` : '';
-
-      // Build stamp section if available
-      const stampSection = proforma.stamp_url ? `
-        <div class="stamp-section">
-          <img src="${proforma.stamp_url}" alt="Stamp" class="stamp-image" />
+        
+        <div class="section">
+          <div class="label">Client Information:</div>
+          <p>Name: ${proforma.client_name}</p>
+          ${proforma.client_phone ? `<p>Phone: ${proforma.client_phone}</p>` : ''}
+          ${proforma.client_email ? `<p>Email: ${proforma.client_email}</p>` : ''}
         </div>
-      ` : '';
+        
+        <div class="section">
+          <div class="label">Details:</div>
+          <p>Date: ${new Date(proforma.proforma_date).toLocaleDateString()}</p>
+          ${proforma.valid_until ? `<p>Valid Until: ${new Date(proforma.valid_until).toLocaleDateString()}</p>` : ''}
+          ${proforma.description ? `<p>Description: ${proforma.description}</p>` : ''}
+        </div>
+        
+        <div class="section">
+          <div class="label">Line Items (Unique):</div>
+          <table>
+            <tr>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Total Price</th>
+            </tr>
+            ${getUniqueItems(proforma.proforma_items)?.map(item => `
+              <tr>
+                <td>${item.description}</td>
+                <td align="right">${item.quantity}</td>
+                <td align="right">${item.unit_price.toLocaleString()}</td>
+                <td align="right">${(item.quantity * item.unit_price).toLocaleString()}</td>
+              </tr>
+            `).join('')}
+            <tr class="total">
+              <td colspan="3" align="right">SUBTOTAL:</td>
+              <td align="right">${proforma.amount.toLocaleString()} ${proforma.currency}</td>
+            </tr>
+            <tr>
+              <td colspan="3" align="right">Discount ${proforma.discount_rate && proforma.discount_rate > 0 ? `(${proforma.discount_rate}%)` : '(0%)'}:</td>
+              <td align="right" style="color: #FF9800;">-${(proforma.discount_amount || 0).toLocaleString()} ${proforma.currency}</td>
+            </tr>
+            <tr>
+              <td colspan="3" align="right">Tax ${proforma.tax_rate && proforma.tax_rate > 0 ? `(${proforma.tax_rate}%)` : '(0%)'}:</td>
+              <td align="right" style="color: #2196F3;">+${(proforma.tax_amount || 0).toLocaleString()} ${proforma.currency}</td>
+            </tr>
+            <tr class="total" style="background: #E8F5E9; font-size: 14px;">
+              <td colspan="3" align="right">FINAL TOTAL:</td>
+              <td align="right" style="color: #4CAF50; font-weight: bold;">${(proforma.total_amount || proforma.amount).toLocaleString()} ${proforma.currency}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="footer">
+          <p>This is an automatically generated proforma invoice.</p>
+          <p>Generated on: ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
 
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            * { margin: 0; padding: 0; }
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 20px; 
-              line-height: 1.6;
-              color: #333;
-            }
-            .document-container {
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            .top-bar {
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              margin-bottom: 30px;
-              gap: 20px;
-              padding-bottom: 20px;
-              border-bottom: 2px solid #333;
-            }
-            .logo-section {
-              flex: 1;
-              display: flex;
-              flex-direction: column;
-              align-items: flex-start;
-              justify-content: center;
-              padding: 10px 0;
-            }
-            .logo-section img {
-              width: 280px;
-              height: 80px;
-              object-fit: contain;
-              margin-bottom: 12px;
-              background: #fff;
-              padding: 8px;
-              border-radius: 4px;
-            }
-            .logo-text {
-              font-size: 14px;
-              font-weight: 600;
-              color: #1a5490;
-              letter-spacing: 1px;
-              margin-top: 4px;
-            }
-            .qr-section {
-              flex-shrink: 0;
-              text-align: center;
-            }
-            .qr-section img {
-              width: 140px;
-              height: 140px;
-              border: 1px solid #ccc;
-              padding: 5px;
-            }
-            .qr-label {
-              font-size: 10px;
-              margin-top: 5px;
-              color: #666;
-            }
-            .stamp-section {
-              flex-shrink: 0;
-              text-align: center;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            }
-            .stamp-image {
-              max-width: 120px;
-              max-height: 120px;
-              border: 1px solid #ddd;
-              border-radius: 5px;
-              padding: 3px;
-            }
-            .sender-info {
-              flex: 1;
-              background: #f9f9f9;
-              padding: 15px;
-              border-radius: 5px;
-              font-size: 12px;
-            }
-            .sender-label {
-              font-weight: bold;
-              font-size: 13px;
-              margin-bottom: 8px;
-            }
-            .sender-field {
-              margin: 3px 0;
-              font-size: 11px;
-              line-height: 1.4;
-            }
-            .sender-field strong {
-              font-weight: 600;
-              color: #1a5490;
-            }
-            .header-section {
-              margin-bottom: 30px;
-              padding: 20px;
-              background: #f5f5f5;
-              border-radius: 5px;
-            }
-            .title { 
-              font-size: 28px; 
-              font-weight: bold;
-              color: #1a5490;
-              margin-bottom: 5px;
-            }
-            .subtitle { 
-              font-size: 14px; 
-              color: #666;
-            }
-            .two-column {
-              display: flex;
-              gap: 30px;
-              margin-bottom: 30px;
-            }
-            .column {
-              flex: 1;
-            }
-            .section-label {
-              font-weight: bold;
-              font-size: 13px;
-              margin-bottom: 8px;
-              color: #1a5490;
-              border-bottom: 1px solid #1a5490;
-              padding-bottom: 5px;
-            }
-            .section-content {
-              font-size: 12px;
-              line-height: 1.8;
-            }
-            .section-content p {
-              margin: 5px 0;
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin-top: 10px;
-              font-size: 12px;
-            }
-            th { 
-              background: #1a5490; 
-              color: white;
-              padding: 10px 8px; 
-              text-align: left; 
-              border: 1px solid #ccc; 
-              font-weight: bold;
-            }
-            td { 
-              padding: 8px; 
-              border: 1px solid #ddd; 
-            }
-            tr:nth-child(even) {
-              background: #f9f9f9;
-            }
-            .total-row {
-              font-weight: bold; 
-              background: #e8f5e9;
-              color: #2e7d32;
-            }
-            .summary-section {
-              margin-top: 20px;
-              padding: 15px;
-              background: #e8f5e9;
-              border-left: 4px solid #2e7d32;
-              border-radius: 3px;
-            }
-            .summary-row {
-              display: flex;
-              justify-content: space-between;
-              margin: 8px 0;
-              font-size: 13px;
-            }
-            .summary-row.final {
-              font-size: 16px;
-              font-weight: bold;
-              color: #2e7d32;
-              border-top: 2px solid #2e7d32;
-              padding-top: 8px;
-            }
-            .footer { 
-              margin-top: 40px; 
-              padding-top: 20px; 
-              border-top: 1px solid #ddd; 
-              font-size: 11px; 
-              color: #666;
-              text-align: center;
-            }
-            .footer-note {
-              margin-top: 10px;
-              font-style: italic;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="document-container">
-            <!-- Top Bar with Logo, QR, Stamp and Sender -->
-            <div class="top-bar">
-              <div class="logo-section">
-                <img src="${logoUrl}" alt="" />
-                <div class="logo-text"> Generate+Grow+Earn</div>
-              </div>
-              <div class="qr-section">
-                <img src="${qrCodeDataUrl}" alt="QR Code" />
-                <div class="qr-label">Scan to view</div>
-              </div>
-              ${stampSection}
-              ${senderSection}
-            </div>
-
-            <!-- Header Section -->
-            <div class="header-section">
-              <div class="title">PROFORMA INVOICE</div>
-              <div class="subtitle">Ref: <strong>${proforma.number}</strong> | Date: ${new Date(proforma.proforma_date).toLocaleDateString()}</div>
-            </div>
-
-            <!-- Bill To and Details -->
-            <div class="two-column">
-              <div class="column">
-                <div class="section-label">Bill To:</div>
-                <div class="section-content">
-                  <p><strong>${proforma.client_name}</strong></p>
-                  ${proforma.client_phone ? `<p>📱 ${proforma.client_phone}</p>` : ''}
-                  ${proforma.client_email ? `<p>✉️ ${proforma.client_email}</p>` : ''}
-                </div>
-              </div>
-              <div class="column">
-                <div class="section-label">Details:</div>
-                <div class="section-content">
-                  <p><strong>Date:</strong> ${new Date(proforma.proforma_date).toLocaleDateString()}</p>
-                  ${proforma.valid_until ? `<p><strong>Valid Until:</strong> ${new Date(proforma.valid_until).toLocaleDateString()}</p>` : ''}
-                  ${proforma.description ? `<p><strong>Description:</strong> ${proforma.description}</p>` : ''}
-                </div>
-              </div>
-            </div>
-
-            <!-- Line Items Table -->
-            <table>
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th style="text-align: right;">Qty</th>
-                  <th style="text-align: right;">Unit Price</th>
-                  <th style="text-align: right;">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${getUniqueItems(proforma.proforma_items)?.map(item => `
-                  <tr>
-                    <td>${item.description}</td>
-                    <td style="text-align: right;">${item.quantity}</td>
-                    <td style="text-align: right;">${item.unit_price.toLocaleString()}</td>
-                    <td style="text-align: right;">${(item.quantity * item.unit_price).toLocaleString()}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-
-            <!-- Summary Section -->
-            <div class="summary-section">
-              <div class="summary-row">
-                <span>Subtotal:</span>
-                <span>${proforma.amount.toLocaleString()} ${proforma.currency}</span>
-              </div>
-              ${proforma.discount_rate && proforma.discount_rate > 0 ? `
-                <div class="summary-row">
-                  <span>Discount (${proforma.discount_rate}%):</span>
-                  <span style="color: #ff9800;">-${(proforma.discount_amount || 0).toLocaleString()} ${proforma.currency}</span>
-                </div>
-              ` : ''}
-              ${proforma.tax_rate && proforma.tax_rate > 0 ? `
-                <div class="summary-row">
-                  <span>Tax (${proforma.tax_rate}%):</span>
-                  <span style="color: #1976d2;">+${(proforma.tax_amount || 0).toLocaleString()} ${proforma.currency}</span>
-                </div>
-              ` : ''}
-              <div class="summary-row final">
-                <span>FINAL TOTAL:</span>
-                <span>${(proforma.total_amount || proforma.amount).toLocaleString()} ${proforma.currency}</span>
-              </div>
-            </div>
-
-            <!-- Footer -->
-            <div class="footer">
-              <p>This is an automatically generated proforma invoice.</p>
-              <p class="footer-note">Generated on: ${new Date().toLocaleString()}</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
-
-      if (format === 'pdf') {
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Proforma-${proforma.number}.html`;
-        link.click();
-      } else {
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Proforma-${proforma.number}.html`;
-        link.click();
-      }
-    } catch (error) {
-      console.error('Error generating proforma document:', error);
-      toast.error('Error generating document');
+    if (format === 'pdf') {
+      // Create PDF using html2canvas + jspdf (fallback: download as HTML)
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Proforma-${proforma.number}.html`;
+      link.click();
+    } else {
+      // For image, we'll use html2canvas if available, otherwise show preview
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Proforma-${proforma.number}.html`;
+      link.click();
     }
   };
 
-  const filteredProformas = proformas.filter((p: ProformaWithItems) =>
+  const filteredProformas = proformas.filter(p =>
     p.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredReceivedProformas = receivedProformas.filter((p: ProformaWithItems) =>
+  const filteredReceivedProformas = receivedProformas.filter(p =>
     p.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -1726,15 +1103,15 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold">{t('proforma.title')}</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">{t('proforma.title')}</h1>
         <Button onClick={async () => {
           if (!showNew) {
             const nextNum = await generateNextProformaNumber();
             setFormData((prev: typeof formData) => ({ ...prev, number: nextNum }));
           }
           setShowNew(!showNew);
-        }} className="gap-2 w-full sm:w-auto">
+        }} className="gap-2">
           <Plus className="h-4 w-4" />
           {t('proforma.new')}
         </Button>
@@ -1754,7 +1131,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 {/* Customer Selector */}
                 <div className="border-b pb-4">
                   <CustomerSelector
-                    onSelectCustomer={(customer: Customer) => {
+                    onSelectCustomer={(customer) => {
                       setSelectedCustomer(customer);
                       setFormData((prev: typeof formData) => ({
                         ...prev,
@@ -1772,7 +1149,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                 {selectedCustomer && (
                   <div className="border-b pb-4">
                     <h3 className="font-bold mb-3 text-sm text-muted-foreground">Proforma Settings</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>{t('proforma.number')}</Label>
                         <div className="p-2 border rounded bg-muted text-sm font-mono font-bold text-primary">
@@ -1815,26 +1192,24 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   />
                 </div>
 
-                {/* Valid Until Section */}
-                <div className="border-b pb-4">
-                  <div>
-                    <Label>{t('proforma.valid_until')}</Label>
-                    <Input
-                      type="date"
-                      value={formData.valid_until}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, valid_until: e.target.value })}
-                    />
-                  </div>
-                  <div className="mt-4">
-                    <Label>{t('invoices.description')}</Label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder={t('invoices.description')}
-                      className="w-full p-2 border rounded"
-                      rows={3}
-                    />
-                  </div>
+                <div>
+                  <Label>{t('proforma.valid_until')}</Label>
+                  <Input
+                    type="date"
+                    value={formData.valid_until}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, valid_until: e.target.value })}
+                  />
+                </div>
+
+                <div className="mt-4">
+                  <Label>{t('invoices.description')}</Label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder={t('invoices.description')}
+                    className="w-full p-2 border rounded"
+                    rows={3}
+                  />
                 </div>
 
                 {/* Line Items Section */}
@@ -1998,52 +1373,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   )}
                 </div>
 
-                {/* Stamp Upload Section */}
-                <div className="border-b pb-4">
-                  <h3 className="font-bold mb-4 flex items-center gap-2">
-                    <ImageIcon className="h-4 w-4" />
-                    Upload Stamp/Signature
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-gray-50 transition">
-                      <input
-                        type="file"
-                        id="stamp-upload"
-                        accept="image/*"
-                        onChange={handleStampFileSelect}
-                        className="hidden"
-                      />
-                      <label htmlFor="stamp-upload" className="cursor-pointer flex flex-col items-center gap-2">
-                        <ImageIcon className="h-8 w-8 text-gray-400" />
-                        <span className="text-sm font-medium">Click to upload or drag and drop</span>
-                        <span className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</span>
-                      </label>
-                    </div>
-                    
-                    {stampPreview && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Preview:</p>
-                        <img src={stampPreview} alt="Stamp preview" className="max-h-32 border rounded" />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setStampFile(null);
-                            setStampPreview(null);
-                          }}
-                        >
-                          Remove Preview
-                        </Button>
-                      </div>
-                    )}
-                    
-                    <p className="text-xs text-gray-500">
-                      ℹ️ Stamp will appear on the right side of the QR code in preview and export.
-                    </p>
-                  </div>
-                </div>
-
                 <div className="flex gap-2">
                   <Button type="submit" disabled={loading || lineItems.length === 0}>
                     {t('common.save')}
@@ -2051,7 +1380,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   <Button type="button" variant="outline" onClick={() => {
                     setShowNew(false);
                     setLineItems([]);
-                    setCurrentItem({ description: '', quantity: 1, unit_price: 0 });
+                    setCurrentItem({ description: '', quantity: 1, unit_price: 0 } as ProformaItem);
                   }}>
                     {t('common.cancel')}
                   </Button>
@@ -2070,7 +1399,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={currentTab} onValueChange={(val: string) => setCurrentTab(val as 'my' | 'received')}>
+          <Tabs value={currentTab} onValueChange={(val: string) => setCurrentTab(val)}>
             <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="my" className="gap-2">
                 <FileDown className="h-4 w-4" />
@@ -2086,7 +1415,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <Input
                 placeholder={`${t('proforma.number')}...`}
                 value={searchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
 
@@ -2097,7 +1426,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   {t('proforma.empty')}
                 </div>
               ) : (
-                filteredProformas.map((proforma: ProformaWithItems) => (
+                filteredProformas.map((proforma: Proforma) => (
                   <motion.div
                     key={proforma.id}
                     initial={{ opacity: 0 }}
@@ -2143,7 +1472,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       {proforma.proforma_items && proforma.proforma_items.length > 0 && (
                         <div className="mt-3 text-xs">
                           <div className="border-t pt-2">
-                            {getUniqueItems(proforma.proforma_items).map((item: ProformaItem, idx: number) => (
+                            {getUniqueItems(proforma.proforma_items).map((item, idx) => (
                               <div key={idx} className="flex justify-between py-1 px-2 bg-muted/50 rounded mb-1">
                                 <span>{item.description}</span>
                                 <span className="text-right">
@@ -2289,7 +1618,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                   📭 No proformas received yet
                 </div>
               ) : (
-                filteredReceivedProformas.map((proforma: ProformaWithItems) => (
+                filteredReceivedProformas.map((proforma: Proforma) => (
                   <motion.div
                     key={proforma.id}
                     initial={{ opacity: 0 }}
@@ -2307,136 +1636,111 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                             <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
                           )}
                         </div>
-                      
-                      {/* Sender Profile Section */}
-                      <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-md mb-3 border border-blue-200 dark:border-blue-800">
-                        <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-2">📤 FROM (Sender Information)</p>
-                        {senderProfiles[proforma.user_id] ? (
-                          <>
-                            <p className="text-sm"><strong>Name:</strong> {senderProfiles[proforma.user_id].full_name || 'N/A'}</p>
-                            {senderProfiles[proforma.user_id].email && (
-                              <p className="text-xs"><strong>Email:</strong> {senderProfiles[proforma.user_id].email}</p>
-                            )}
-                            {senderProfiles[proforma.user_id].phone_number && (
-                              <p className="text-xs"><strong>Phone:</strong> {senderProfiles[proforma.user_id].phone_number}</p>
-                            )}
-                            {senderProfiles[proforma.user_id].company_name && (
-                              <p className="text-xs"><strong>Company:</strong> {senderProfiles[proforma.user_id].company_name}</p>
-                            )}
-                            {senderProfiles[proforma.user_id].tin_number && (
-                              <p className="text-xs"><strong>TIN:</strong> {senderProfiles[proforma.user_id].tin_number}</p>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">Sender information loading...</p>
+                        <p className="text-sm font-semibold text-blue-700">From: {proforma.client_name}</p>
+                        {proforma.client_phone && <p className="text-xs text-muted-foreground">{proforma.client_phone}</p>}
+                        {proforma.sent_date && <p className="text-xs text-muted-foreground">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
+                      </div>
+                      <div className="flex items-end flex-col gap-2">
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Amount</p>
+                          <p className="text-lg font-bold text-blue-600">
+                            {(proforma.total_amount || proforma.amount).toLocaleString()} {proforma.currency}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {proforma.description && (
+                      <p className="text-sm text-muted-foreground mb-3 italic">{proforma.description}</p>
+                    )}
+
+                    {/* Items Summary - UNIQUE ONLY */}
+                    <div className="mb-3 text-sm bg-white p-2 rounded">
+                      <p className="font-semibold mb-1">Items:</p>
+                      {getUniqueItems(proforma.proforma_items).map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-xs">
+                          <span>{item.description} × {item.quantity}</span>
+                          <span>{(item.quantity * item.unit_price).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Tax/Discount Info */}
+                    {(proforma.tax_rate || proforma.discount_rate) && (
+                      <div className="mb-3 text-xs space-y-1 font-semibold">
+                        {proforma.discount_rate > 0 && (
+                          <div className="text-orange-600">Discount: -{(proforma.discount_amount || 0).toLocaleString()} ({proforma.discount_rate}%)</div>
+                        )}
+                        {proforma.tax_rate > 0 && (
+                          <div className="text-blue-600">Tax: +{(proforma.tax_amount || 0).toLocaleString()} ({proforma.tax_rate}%)</div>
                         )}
                       </div>
-                      
-                      {proforma.client_phone && <p className="text-xs text-muted-foreground">{proforma.client_phone}</p>}
-                      {proforma.sent_date && <p className="text-xs text-muted-foreground">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
-                    </div>
-                    <div className="flex items-end flex-col gap-2">
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Amount</p>
-                        <p className="text-lg font-bold text-blue-600">
-                          {(proforma.total_amount || proforma.amount).toLocaleString()} {proforma.currency}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                    )}
 
-                  {/* Description */}
-                  {proforma.description && (
-                    <p className="text-sm text-muted-foreground mb-3 italic">{proforma.description}</p>
-                  )}
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handlePreviewReceivedProforma(proforma)}
+                        className="gap-1"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Preview
+                      </Button>
 
-                  {/* Items Summary - UNIQUE ONLY */}
-                  <div className="mb-3 text-sm bg-white p-2 rounded">
-                    <p className="font-semibold mb-1">Items:</p>
-                    {getUniqueItems(proforma.proforma_items).map((item: ProformaItem, idx: number) => (
-                      <div key={idx} className="flex justify-between text-xs">
-                        <span>{item.description} × {item.quantity}</span>
-                        <span>{(item.quantity * item.unit_price).toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Tax/Discount Info */}
-                  {(proforma.tax_rate || proforma.discount_rate) && (
-                    <div className="mb-3 text-xs space-y-1 font-semibold">
-                      {proforma.discount_rate > 0 && (
-                        <div className="text-orange-600">Discount: -{(proforma.discount_amount || 0).toLocaleString()} ({proforma.discount_rate}%)</div>
+                      {proforma.status === 'sent' && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAcceptProforma(proforma)}
+                            disabled={loading}
+                            className="gap-1 bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-3 w-3" />
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRejectProforma(proforma)}
+                            disabled={loading}
+                            className="gap-1 text-red-600 hover:text-red-700"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Reject
+                          </Button>
+                        </>
                       )}
-                      {proforma.tax_rate > 0 && (
-                        <div className="text-blue-600">Tax: +{(proforma.tax_amount || 0).toLocaleString()} ({proforma.tax_rate}%)</div>
-                      )}
-                    </div>
-                  )}
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handlePreviewReceivedProforma(proforma)}
-                      className="gap-1"
-                    >
-                      <Eye className="h-4 w-4" />
-                      Preview
-                    </Button>
-
-                    {/* Show accept/reject for received proformas that haven't been accepted or rejected */}
-                    {proforma.user_id !== currentUser?.id && proforma.status !== 'accepted' && proforma.status !== 'rejected' && (
-                      <>
+                      {proforma.status === 'accepted' && (
                         <Button
                           size="sm"
-                          onClick={() => handleAcceptProforma(proforma)}
+                          onClick={() => handleConvertToInvoice(proforma)}
                           disabled={loading}
                           className="gap-1 bg-green-600 hover:bg-green-700"
                         >
-                          <CheckCircle className="h-3 w-3" />
-                          Accept
+                          <ArrowRight className="h-3 w-3" />
+                          Convert to Invoice
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleRejectProforma(proforma)}
-                          disabled={loading}
-                          className="gap-1 text-red-600 hover:text-red-700"
-                        >
-                          <XCircle className="h-3 w-3" />
-                          Reject
-                        </Button>
-                      </>
-                    )}
+                      )}
 
-                    {proforma.status === 'accepted' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleConvertToInvoice(proforma)}
-                        disabled={loading}
-                        className="gap-1 bg-green-600 hover:bg-green-700"
-                      >
-                        <ArrowRight className="h-3 w-3" />
-                        Convert to Invoice
-                      </Button>
-                    )}
+                      {proforma.status === 'converted' && (
+                        <div className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-700 font-semibold">
+                          ✅ Converted to Invoice
+                        </div>
+                      )}
 
-                    {proforma.status === 'converted' && (
-                      <div className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-700 font-semibold">
-                        ✅ Converted to Invoice
-                      </div>
-                    )}
-
-                    {(proforma.status === 'rejected' || proforma.status === 'draft') && (
-                      <div className="text-xs px-2 py-1 rounded bg-gray-500/10 text-gray-700 font-semibold">
-                        {proforma.status.toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ))
-            )}
+                      {(proforma.status === 'rejected' || proforma.status === 'draft') && (
+                        <div className="text-xs px-2 py-1 rounded bg-gray-500/10 text-gray-700 font-semibold">
+                          {proforma.status.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -2459,101 +1763,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <Button variant="ghost" onClick={() => setShowPreview(false)}>✕</Button>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Sender Profile Section */}
-              {/* Show sender info based on whether this is a received or own proforma */}
-              {previewProforma.user_id !== currentUser?.id ? (
-                /* Received proforma - show actual sender info */
-                senderProfiles[previewProforma.user_id] && (
-                  <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-3">📤 FROM (Sender Information)</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Name</p>
-                        <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].full_name || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Email</p>
-                        <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].email || 'N/A'}</p>
-                      </div>
-                      {senderProfiles[previewProforma.user_id].company_name && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Company</p>
-                          <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].company_name}</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-xs text-muted-foreground">Phone</p>
-                        <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].phone_number || 'N/A'}</p>
-                      </div>
-                      {senderProfiles[previewProforma.user_id].tin_number && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">TIN</p>
-                          <p className="font-semibold text-sm">{senderProfiles[previewProforma.user_id].tin_number}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              ) : (
-                /* Own proforma - show our user profile */
-                userProfile && (
-                  <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-3">📤 FROM (Sender Information)</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Name</p>
-                        <p className="font-semibold text-sm">{userProfile.full_name || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Email</p>
-                        <p className="font-semibold text-sm">{userProfile.email || 'N/A'}</p>
-                      </div>
-                      {userProfile.company_name && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Company</p>
-                          <p className="font-semibold text-sm">{userProfile.company_name}</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-xs text-muted-foreground">Phone</p>
-                        <p className="font-semibold text-sm">{userProfile.phone_number || 'N/A'}</p>
-                      </div>
-                      {userProfile.tin_number && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">TIN</p>
-                          <p className="font-semibold text-sm">{userProfile.tin_number}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              )}
-
-              {/* Stamp Display */}
-              {previewProforma.stamp_url ? (
-                <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border border-amber-200 dark:border-amber-800 dark:bg-gradient-to-br dark:from-amber-950 dark:to-orange-950">
-                  <p className="text-xs font-bold text-amber-700 dark:text-amber-300 mb-3">🔖 STAMP/LOGO</p>
-                  <div className="flex justify-center">
-                    <img 
-                      src={previewProforma.stamp_url} 
-                      alt="Stamp" 
-                      className="max-w-[150px] max-h-[150px] rounded-md border border-amber-300 dark:border-amber-700 shadow-sm"
-                      onError={(e) => {
-                        console.error('Error loading stamp from URL:', previewProforma.stamp_url);
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
-                    {previewProforma.stamp_uploaded_at && `Uploaded: ${new Date(previewProforma.stamp_uploaded_at).toLocaleDateString()}`}
-                  </p>
-                </div>
-              ) : (
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                  <p className="text-xs text-gray-500">🔖 No stamp/logo uploaded yet</p>
-                </div>
-              )}
-
               <div className="grid grid-cols-2 gap-4 pb-4 border-b">
                 <div>
                   <p className="text-xs text-muted-foreground">Client</p>
@@ -2591,7 +1800,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       </tr>
                     </thead>
                     <tbody>
-                      {getUniqueItems(previewProforma.proforma_items).map((item: ProformaItem, idx: number) => (
+                      {getUniqueItems(previewProforma.proforma_items).map((item, idx) => (
                         <tr key={idx} className="border-t">
                           <td className="p-2">{item.description}</td>
                           <td className="p-2 text-right">{item.quantity}</td>
@@ -2640,47 +1849,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
               <Button variant="outline" onClick={() => setShowPreview(false)} className="w-full mt-4">
                 Close
               </Button>
-
-              {/* Accept/Reject Buttons for Received Proformas */}
-              {previewProforma.user_id !== currentUser?.id && previewProforma.status !== 'accepted' && previewProforma.status !== 'rejected' && (
-                <div className="flex gap-2 mt-4">
-                  <Button
-                    onClick={() => {
-                      handleAcceptProforma(previewProforma);
-                      setShowPreview(false);
-                    }}
-                    disabled={loading}
-                    className="flex-1 gap-2 bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                    Accept Proforma
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      handleRejectProforma(previewProforma);
-                      setShowPreview(false);
-                    }}
-                    disabled={loading}
-                    variant="outline"
-                    className="flex-1 gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Reject Proforma
-                  </Button>
-                </div>
-              )}
-
-              {/* Convert to Invoice Button for Accepted Proformas (Sender) */}
-              {previewProforma.user_id === currentUser?.id && previewProforma.status === 'accepted' && (
-                <Button
-                  onClick={() => convertProformaToInvoice(previewProforma)}
-                  disabled={loading}
-                  className="w-full mt-4 gap-2 bg-blue-600 hover:bg-blue-700"
-                >
-                  <ArrowRight className="h-4 w-4" />
-                  Convert to Invoice
-                </Button>
-              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Edit Modal - WITH TABS */}
       {showEdit && editProforma && (
@@ -2912,7 +2084,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       size="sm" 
                       variant="outline"
                       onClick={() => {
-                        setEditLineItems([...editLineItems, { description: '', quantity: 1, unit_price: 0 }]);
+                        setEditLineItems([...editLineItems, { description: '', quantity: 1, unit_price: 0 } as ProformaItem]);
                       }}
                       className="w-full gap-1 mt-3"
                     >
@@ -3100,7 +2272,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         onClose={() => setShowCustomerModal(false)}
         onCustomerSaved={(customer) => {
           setSelectedCustomer(customer);
-          setFormData(prev => ({
+          setFormData((prev: typeof formData) => ({
             ...prev,
             client_name: customer.full_name,
             client_phone: customer.phone_number || '',

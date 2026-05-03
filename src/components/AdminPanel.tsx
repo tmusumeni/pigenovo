@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { cn } from '@/lib/utils';
 import { 
   Card, 
   CardContent, 
@@ -12,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TeamMembersAdmin } from '@/components/TeamMembersAdmin';
 import { 
   Plus, 
   Trash2, 
@@ -28,11 +26,14 @@ import {
   ArrowDownLeft,
   AlertCircle,
   User,
-  ExternalLink,
-  Users
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
+
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ');
+}
 
 export function AdminPanel() {
   const [assets, setAssets] = useState<any[]>([]);
@@ -56,8 +57,6 @@ export function AdminPanel() {
   const [usdtRate, setUsdtRate] = useState('1300');
   const [piRate, setPiRate] = useState('45000');
   const [proformaExportCharge, setProformaExportCharge] = useState('1000');
-  const [proformaSendCharge, setProformaSendCharge] = useState('500');
-  const [totalPlatformIncome, setTotalPlatformIncome] = useState(0);
   
   // Task Form
   const [taskTitle, setTaskTitle] = useState('');
@@ -83,7 +82,6 @@ export function AdminPanel() {
   const [platformWallet, setPlatformWallet] = useState<any>(null);
   const [platformEarnings, setPlatformEarnings] = useState<any[]>([]);
   const [earningsSummary, setEarningsSummary] = useState<any>(null);
-  const [platformCharges, setPlatformCharges] = useState({ export_fee: 0, send_fee: 0, total: 0 });
   
   const [loading, setLoading] = useState(false);
 
@@ -98,7 +96,6 @@ export function AdminPanel() {
     fetchProcessedFinancials();
     fetchExchangeRates();
     fetchProformaCharge();
-    fetchProformaSendCharge();
     fetchAllProfiles();
     fetchAllTrades();
     fetchUserWalletData();
@@ -221,57 +218,12 @@ export function AdminPanel() {
 
   const fetchProformaCharge = async () => {
     try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('id', 'proforma_export_charge')
-        .single();
-
-      if (error) {
-        // If record doesn't exist yet, try to create it with default value
-        console.log('Export charge not found, initializing with default 1000');
-        const { error: insertError } = await supabase
-          .from('settings')
-          .insert({
-            id: 'proforma_export_charge',
-            value: { charge: 1000 }
-          });
-        if (insertError) console.error('Error initializing export charge:', insertError);
-        setProformaExportCharge('1000');
-      } else if (data) {
-        setProformaExportCharge(data.value?.charge?.toString() || '1000');
+      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
+      if (data) {
+        setProformaExportCharge(data.value.charge.toString());
       }
     } catch (error) {
-      console.error('Error fetching export charge:', error);
-      setProformaExportCharge('1000'); // Use default if not set
-    }
-  };
-
-  const fetchProformaSendCharge = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('id', 'proforma_send_charge')
-        .single();
-
-      if (error) {
-        // If record doesn't exist yet, try to create it with default value
-        console.log('Send charge not found, initializing with default 500');
-        const { error: insertError } = await supabase
-          .from('settings')
-          .insert({
-            id: 'proforma_send_charge',
-            value: { charge: 500 }
-          });
-        if (insertError) console.error('Error initializing send charge:', insertError);
-        setProformaSendCharge('500');
-      } else if (data) {
-        setProformaSendCharge(data.value?.charge?.toString() || '500');
-      }
-    } catch (error) {
-      console.error('Error fetching send charge:', error);
-      setProformaSendCharge('500'); // Use default if not set
+      // Use default if not set
     }
   };
 
@@ -437,101 +389,8 @@ export function AdminPanel() {
       } else {
         setPlatformWallet(data);
       }
-      
-      // Fetch platform charges (export and send fees)
-      const { data: chargesData, error: chargesError } = await supabase
-        .from('wallet_transactions')
-        .select('method, amount')
-        .in('method', ['export_fee', 'send_fee'])
-        .eq('status', 'approved');
-      
-      if (!chargesError && chargesData) {
-        const exportFees = chargesData
-          .filter(tx => tx.method === 'export_fee')
-          .reduce((sum, tx) => sum + Number(tx.amount), 0);
-        
-        const sendFees = chargesData
-          .filter(tx => tx.method === 'send_fee')
-          .reduce((sum, tx) => sum + Number(tx.amount), 0);
-        
-        setPlatformCharges({
-          export_fee: exportFees,
-          send_fee: sendFees,
-          total: exportFees + sendFees
-        });
-      }
-
-      // Calculate total platform income from all sources
-      await calculateTotalPlatformIncome(data);
     } catch (error) {
       console.error('Error in fetchPlatformWallet:', error);
-    }
-  };
-
-  const calculateTotalPlatformIncome = async (walletData: any) => {
-    try {
-      let totalIncome = 0;
-
-      // 1. Platform wallet balance (existing balance from all sources)
-      if (walletData && walletData.balance) {
-        totalIncome += Number(walletData.balance);
-      }
-
-      // 2. Trading fees
-      if (walletData && walletData.total_trading_fees) {
-        totalIncome += Number(walletData.total_trading_fees);
-      }
-
-      // 3. User losses (from trading)
-      if (walletData && walletData.total_user_losses) {
-        totalIncome += Number(walletData.total_user_losses);
-      }
-
-      // 4. Proforma export charges
-      const { data: exportFees } = await supabase
-        .from('wallet_transactions')
-        .select('amount')
-        .eq('method', 'export_fee')
-        .eq('status', 'approved');
-      
-      const exportTotal = exportFees?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
-      totalIncome += exportTotal;
-
-      // 5. Proforma send charges
-      const { data: sendFees } = await supabase
-        .from('wallet_transactions')
-        .select('amount')
-        .eq('method', 'send_fee')
-        .eq('status', 'approved');
-      
-      const sendTotal = sendFees?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
-      totalIncome += sendTotal;
-
-      // 6. Approved ad shares rewards (deducted from platform)
-      const { data: approvedAdShares } = await supabase
-        .from('ad_shares')
-        .select('*, ads(reward_amount)')
-        .eq('status', 'approved');
-      
-      const adSharesCost = approvedAdShares?.reduce((sum, share) => {
-        return sum + Number((share.ads as any)?.reward_amount || 0);
-      }, 0) || 0;
-      totalIncome -= adSharesCost; // Subtract from income (platform pays users)
-
-      // 7. Approved task submissions rewards (deducted from platform)
-      const { data: approvedProofs } = await supabase
-        .from('proof_submissions')
-        .select('*, earn_tasks(reward_amount)')
-        .eq('status', 'approved');
-      
-      const tasksCost = approvedProofs?.reduce((sum, proof) => {
-        return sum + Number((proof.earn_tasks as any)?.reward_amount || 0);
-      }, 0) || 0;
-      totalIncome -= tasksCost; // Subtract from income (platform pays users)
-
-      setTotalPlatformIncome(totalIncome);
-    } catch (error) {
-      console.error('Error calculating total platform income:', error);
     }
   };
 
@@ -1010,69 +869,15 @@ export function AdminPanel() {
     e.preventDefault();
     try {
       setLoading(true);
-      
-      const chargeValue = Number(proformaExportCharge);
-      if (isNaN(chargeValue) || chargeValue < 0) {
-        toast.error('Please enter a valid charge amount');
-        setLoading(false);
-        return;
-      }
-
       const { error } = await supabase.from('settings').upsert({
         id: 'proforma_export_charge',
-        value: { charge: chargeValue },
-        updated_at: new Date().toISOString()
+        value: { charge: Number(proformaExportCharge) }
       });
-      
-      if (error) {
-        console.error('Upsert error:', error);
-        throw error;
-      }
-      
-      toast.success(`✅ Proforma export charge updated to ${chargeValue} RWF`);
-      console.log('Export charge saved successfully:', chargeValue);
-      
-      // Refresh the value to confirm it was saved
-      await fetchProformaCharge();
+      if (error) throw error;
+      toast.success('Proforma export charge updated');
+      fetchProformaCharge();
     } catch (error: any) {
-      console.error('Error updating export charge:', error);
-      toast.error(error.message || 'Failed to update export charge');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateProformaSendCharge = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      
-      const chargeValue = Number(proformaSendCharge);
-      if (isNaN(chargeValue) || chargeValue < 0) {
-        toast.error('Please enter a valid charge amount');
-        setLoading(false);
-        return;
-      }
-
-      const { error } = await supabase.from('settings').upsert({
-        id: 'proforma_send_charge',
-        value: { charge: chargeValue },
-        updated_at: new Date().toISOString()
-      });
-      
-      if (error) {
-        console.error('Upsert error:', error);
-        throw error;
-      }
-      
-      toast.success(`✅ Proforma send charge updated to ${chargeValue} RWF`);
-      console.log('Send charge saved successfully:', chargeValue);
-      
-      // Refresh the value to confirm it was saved
-      await fetchProformaSendCharge();
-    } catch (error: any) {
-      console.error('Error updating send charge:', error);
-      toast.error(error.message || 'Failed to update send charge');
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
@@ -1333,10 +1138,6 @@ export function AdminPanel() {
           </TabsTrigger>
           <TabsTrigger value="wallets" className="rounded-lg flex gap-2 items-center">
             💰 Wallet Analytics
-          </TabsTrigger>
-          <TabsTrigger value="team" className="rounded-lg flex gap-2 items-center">
-            <Users className="h-4 w-4" />
-            Team Members
           </TabsTrigger>
           <TabsTrigger value="users" className="rounded-lg">Users</TabsTrigger>
           <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
@@ -2154,89 +1955,6 @@ export function AdminPanel() {
                 <p className="text-xs text-muted-foreground mt-2">From user trading losses</p>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">📤 Export Charges</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  {platformCharges.export_fee.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })} RWF
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">From proforma exports</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">📧 Send Charges</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {platformCharges.send_fee.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })} RWF
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">From proforma sends</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">💳 Platform Charges Total</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  {platformCharges.total.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })} RWF
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">Export + Send fees</p>
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 border-2 border-primary">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex gap-2 items-center text-lg">
-                  <span className="text-2xl">💰</span>
-                  Total Platform Income
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-primary">
-                  {totalPlatformIncome.toLocaleString('en-US', { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
-                  })} RWF
-                </div>
-                <p className="text-sm text-muted-foreground mt-3">
-                  Aggregated from: Platform Balance + Trading Fees + User Losses + Export Charges + Send Charges - Ads & Tasks Rewards
-                </p>
-                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                  <div className="p-2 bg-background rounded border">
-                    <div className="text-muted-foreground">Balance</div>
-                    <div className="font-bold">{Number(platformWallet?.balance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })} RWF</div>
-                  </div>
-                  <div className="p-2 bg-background rounded border">
-                    <div className="text-muted-foreground">Trades</div>
-                    <div className="font-bold text-blue-600">{Number(platformWallet?.total_trading_fees || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })} RWF</div>
-                  </div>
-                  <div className="p-2 bg-background rounded border">
-                    <div className="text-muted-foreground">Losses</div>
-                    <div className="font-bold text-amber-600">{Number(platformWallet?.total_user_losses || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })} RWF</div>
-                  </div>
-                  <div className="p-2 bg-background rounded border">
-                    <div className="text-muted-foreground">Charges</div>
-                    <div className="font-bold text-red-600">{platformCharges.total.toLocaleString('en-US', { maximumFractionDigits: 0 })} RWF</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           <Card>
@@ -2571,10 +2289,6 @@ export function AdminPanel() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="team" className="space-y-6">
-          <TeamMembersAdmin />
-        </TabsContent>
-
         <TabsContent value="settings">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <Card>
@@ -2614,8 +2328,8 @@ export function AdminPanel() {
 
             <Card>
               <CardHeader>
-                <CardTitle>📤 Proforma Export Charge</CardTitle>
-                <CardDescription>Set the charge for exporting proformas to PDF or image.</CardDescription>
+                <CardTitle>Proforma Export Charge</CardTitle>
+                <CardDescription>Set the charge for exporting proformas to PDF or image before conversion.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleUpdateProformaCharge} className="space-y-4">
@@ -2629,34 +2343,7 @@ export function AdminPanel() {
                       required
                       min="0"
                     />
-                    <p className="text-xs text-muted-foreground">Users pay this when exporting proformas</p>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    {loading ? 'Updating...' : 'Update Charge'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>📧 Proforma Send Charge</CardTitle>
-                <CardDescription>Set the charge for sending proformas to clients.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleUpdateProformaSendCharge} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sendCharge">Send Charge (RWF)</Label>
-                    <Input 
-                      id="sendCharge" 
-                      type="number" 
-                      value={proformaSendCharge}
-                      onChange={(e) => setProformaSendCharge(e.target.value)}
-                      required
-                      min="0"
-                    />
-                    <p className="text-xs text-muted-foreground">Users pay this when sending proformas to clients</p>
+                    <p className="text-xs text-muted-foreground">Users will pay this amount when exporting proformas to PDF or image</p>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     <DollarSign className="h-4 w-4 mr-2" />

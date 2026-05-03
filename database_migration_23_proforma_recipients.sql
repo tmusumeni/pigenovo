@@ -39,6 +39,12 @@ CREATE INDEX IF NOT EXISTS idx_proforma_recipients_status ON public.proforma_rec
 -- Enable RLS on proforma_recipients
 ALTER TABLE public.proforma_recipients ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view their received proformas" ON public.proforma_recipients;
+DROP POLICY IF EXISTS "Senders can view their sent proformas recipients" ON public.proforma_recipients;
+DROP POLICY IF EXISTS "RPC functions can insert recipients" ON public.proforma_recipients;
+DROP POLICY IF EXISTS "RPC functions can update recipients" ON public.proforma_recipients;
+
 -- Allow users to view their received proformas (as receiver)
 CREATE POLICY "Users can view their received proformas"
   ON public.proforma_recipients

@@ -29,9 +29,8 @@ interface Invoice {
   tax_amount?: number;
   discount_amount?: number;
   total_amount?: number;
+  user_id: string;
   created_at: string;
-  stamp_url?: string;
-  stamp_uploaded_at?: string;
 }
 
 interface InvoiceItem {
@@ -51,11 +50,6 @@ export function Invoices() {
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [walletBalance, setWalletBalance] = useState(0);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [stampFile, setStampFile] = useState<File | null>(null);
-  const [stampPreview, setStampPreview] = useState<string | null>(null);
-  const [stampUploading, setStampUploading] = useState(false);
-  const [currentStampUrl, setCurrentStampUrl] = useState<string | null>(null);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -71,137 +65,9 @@ export function Invoices() {
   });
 
   useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      // Fetch user profile with TIN
-      if (user) {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle(); // Use maybeSingle to handle case where profile doesn't exist yet
-        
-        if (error) {
-          console.error('Error fetching user profile:', error);
-        } else if (profile) {
-          setUserProfile(profile);
-        }
-      }
-    };
-    init();
     fetchInvoices();
     fetchWalletBalance();
   }, []);
-
-  const handleStampFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
-        return;
-      }
-      
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('File size must be less than 5MB');
-        return;
-      }
-      
-      setStampFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setStampPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadStamp = async (invoiceId: string) => {
-    if (!stampFile) return null;
-    
-    try {
-      setStampUploading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-      
-      const fileExt = stampFile.name.split('.').pop();
-      const fileName = `stamps/${user.id}/${invoiceId}/${Date.now()}.${fileExt}`;
-      
-      // Try to upload - if bucket doesn't exist, create it
-      let uploadError: any = null;
-      
-      const uploadResult = await supabase.storage
-        .from('proforma-stamps')
-        .upload(fileName, stampFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      uploadError = uploadResult.error;
-      
-      // If bucket doesn't exist, create it and retry
-      if (uploadError?.message?.includes('Bucket not found') || uploadError?.message?.includes('bucket')) {
-        console.log('Creating proforma-stamps bucket...');
-        
-        // Attempt to create bucket via SQL
-        const { error: createBucketError } = await supabase
-          .rpc('create_bucket_if_not_exists', { 
-            bucket_name: 'proforma-stamps',
-            is_public: true 
-          });
-        
-        if (createBucketError) {
-          console.warn('Could not auto-create bucket via RPC, bucket must be created manually in Supabase dashboard');
-          throw new Error('Storage bucket "proforma-stamps" not found. Please create it in your Supabase dashboard (Storage > Create bucket > Name: proforma-stamps)');
-        }
-        
-        // Retry upload after bucket creation
-        const retryResult = await supabase.storage
-          .from('proforma-stamps')
-          .upload(fileName, stampFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
-        
-        if (retryResult.error) throw retryResult.error;
-      } else if (uploadError) {
-        throw uploadError;
-      }
-      
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('proforma-stamps')
-        .getPublicUrl(fileName);
-      
-      // Update invoice with stamp URL
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update({
-          stamp_url: publicUrl,
-          stamp_uploaded_at: new Date().toISOString()
-        })
-        .eq('id', invoiceId);
-      
-      if (updateError) throw updateError;
-      
-      setCurrentStampUrl(publicUrl);
-      setStampFile(null);
-      setStampPreview(null);
-      toast.success('Stamp uploaded successfully');
-      await fetchInvoices();
-      return publicUrl;
-    } catch (error: any) {
-      console.error('Error uploading stamp:', error);
-      const errorMsg = error?.message || 'Failed to upload stamp';
-      toast.error(errorMsg);
-      return null;
-    } finally {
-      setStampUploading(false);
-    }
-  };
 
   const generateNextInvoiceNumber = async () => {
     try {
@@ -245,357 +111,104 @@ export function Invoices() {
     }
   };
 
-  const generateInvoiceDocument = async (invoice: Invoice, items: InvoiceItem[], format: 'pdf' | 'image') => {
-    try {
-      // Dynamically import qrcode
-      const QRCode = (await import('qrcode')).default;
-      
-      // Generate QR code for invoice link
-      const invoiceUrl = `${window.location.origin}/#/invoice/${invoice.id}`;
-      const qrCodeDataUrl = await QRCode.toDataURL(invoiceUrl, {
-        errorCorrectionLevel: 'H',
-        type: 'image/png',
-        width: 150,
-        margin: 1,
-      });
-
-      // Logo URL (from public assets) - use absolute URL for exports
-      const logoUrl = `${window.location.origin}/logo.png`;
-
-      // Build sender profile section
-      const senderSection = userProfile ? `
-        <div class="sender-info">
-          <div class="sender-label">📤 FROM (Sender Information)</div>
-          <p class="sender-field"><strong>Name:</strong> ${userProfile.full_name || 'N/A'}</p>
-          ${userProfile.email ? `<p class="sender-field"><strong>Email:</strong> ${userProfile.email}</p>` : ''}
-          ${userProfile.phone_number ? `<p class="sender-field"><strong>Phone:</strong> ${userProfile.phone_number}</p>` : ''}
-          ${userProfile.company_name ? `<p class="sender-field"><strong>Company:</strong> ${userProfile.company_name}</p>` : ''}
-          ${userProfile.tin_number ? `<p class="sender-field"><strong>TIN:</strong> ${userProfile.tin_number}</p>` : ''}
+  const generateInvoiceDocument = (invoice: Invoice, items: InvoiceItem[], format: 'pdf' | 'image') => {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+          .title { font-size: 24px; font-weight: bold; }
+          .subtitle { font-size: 14px; color: #666; }
+          .section { margin-bottom: 20px; }
+          .label { font-weight: bold; margin-top: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { background: #f0f0f0; padding: 8px; text-align: left; border: 1px solid #ddd; }
+          td { padding: 8px; border: 1px solid #ddd; }
+          .total { font-weight: bold; background: #f9f9f9; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">INVOICE</div>
+          <div class="subtitle">Invoice #: ${invoice.number}</div>
         </div>
-      ` : '';
-
-      // Build stamp section if available
-      const stampSection = invoice.stamp_url ? `
-        <div class="stamp-section">
-          <img src="${invoice.stamp_url}" alt="Stamp" class="stamp-image" />
+        
+        <div class="section">
+          <div class="label">Bill To:</div>
+          <p>Name: ${invoice.client_name}</p>
+          ${invoice.client_phone ? `<p>Phone: ${invoice.client_phone}</p>` : ''}
+          ${invoice.client_email ? `<p>Email: ${invoice.client_email}</p>` : ''}
         </div>
-      ` : '';
+        
+        <div class="section">
+          <div class="label">Invoice Details:</div>
+          <p>Date: ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
+          ${invoice.due_date ? `<p>Due Date: ${new Date(invoice.due_date).toLocaleDateString()}</p>` : ''}
+          <p>Status: ${invoice.status.toUpperCase()}</p>
+          ${invoice.description ? `<p>Description: ${invoice.description}</p>` : ''}
+        </div>
+        
+        <div class="section">
+          <div class="label">Line Items:</div>
+          <table>
+            <tr>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+            </tr>
+            ${items.map(item => `
+              <tr>
+                <td>${item.description}</td>
+                <td align="right">${item.quantity}</td>
+                <td align="right">${item.unit_price.toLocaleString()}</td>
+                <td align="right">${item.amount.toLocaleString()}</td>
+              </tr>
+            `).join('')}
+            <tr class="total">
+              <td colspan="3" align="right">SUBTOTAL:</td>
+              <td align="right">${invoice.amount.toLocaleString()} ${invoice.currency}</td>
+            </tr>
+            <tr>
+              <td colspan="3" align="right">Discount ${invoice.discount_rate && invoice.discount_rate > 0 ? `(${invoice.discount_rate}%)` : '(0%)'}:</td>
+              <td align="right" style="color: #FF9800;">-${(invoice.discount_amount || 0).toLocaleString()} ${invoice.currency}</td>
+            </tr>
+            <tr>
+              <td colspan="3" align="right">Tax ${invoice.tax_rate && invoice.tax_rate > 0 ? `(${invoice.tax_rate}%)` : '(0%)'}:</td>
+              <td align="right" style="color: #2196F3;">+${(invoice.tax_amount || 0).toLocaleString()} ${invoice.currency}</td>
+            </tr>
+            <tr class="total" style="background: #E8F5E9; font-size: 14px;">
+              <td colspan="3" align="right">FINAL TOTAL:</td>
+              <td align="right" style="color: #4CAF50; font-weight: bold;">${(invoice.total_amount || invoice.amount).toLocaleString()} ${invoice.currency}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="footer">
+          <p>This is an automatically generated invoice.</p>
+          <p>Generated on: ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
 
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            * { margin: 0; padding: 0; }
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 20px; 
-              line-height: 1.6;
-              color: #333;
-            }
-            .document-container {
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            .top-bar {
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              margin-bottom: 30px;
-              gap: 20px;
-              padding-bottom: 20px;
-              border-bottom: 2px solid #333;
-            }
-            .logo-section {
-              flex: 1;
-              display: flex;
-              flex-direction: column;
-              align-items: flex-start;
-              justify-content: center;
-              padding: 10px 0;
-            }
-            .logo-section img {
-              width: 280px;
-              height: 80px;
-              object-fit: contain;
-              margin-bottom: 12px;
-              background: #fff;
-              padding: 8px;
-              border-radius: 4px;
-            }
-            .logo-text {
-              font-size: 14px;
-              font-weight: 600;
-              color: #1a5490;
-              letter-spacing: 1px;
-              margin-top: 4px;
-            }
-            .qr-section {
-              flex-shrink: 0;
-              text-align: center;
-            }
-            .qr-section img {
-              width: 140px;
-              height: 140px;
-              border: 1px solid #ccc;
-              padding: 5px;
-            }
-            .qr-label {
-              font-size: 10px;
-              margin-top: 5px;
-              color: #666;
-            }
-            .stamp-section {
-              flex-shrink: 0;
-              text-align: center;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            }
-            .stamp-image {
-              max-width: 120px;
-              max-height: 120px;
-              border: 1px solid #ddd;
-              border-radius: 5px;
-              padding: 3px;
-            }
-            .sender-info {
-              flex: 1;
-              background: #f9f9f9;
-              padding: 15px;
-              border-radius: 5px;
-              font-size: 12px;
-            }
-            .sender-label {
-              font-weight: bold;
-              font-size: 13px;
-              margin-bottom: 8px;
-            }
-            .sender-field {
-              margin: 3px 0;
-              font-size: 11px;
-              line-height: 1.4;
-            }
-            .sender-field strong {
-              font-weight: 600;
-              color: #1a5490;
-            }
-            .header-section {
-              margin-bottom: 30px;
-              padding: 20px;
-              background: #f5f5f5;
-              border-radius: 5px;
-            }
-            .title { 
-              font-size: 28px; 
-              font-weight: bold;
-              color: #1a5490;
-              margin-bottom: 5px;
-            }
-            .subtitle { 
-              font-size: 14px; 
-              color: #666;
-            }
-            .two-column {
-              display: flex;
-              gap: 30px;
-              margin-bottom: 30px;
-            }
-            .column {
-              flex: 1;
-            }
-            .section-label {
-              font-weight: bold;
-              font-size: 13px;
-              margin-bottom: 8px;
-              color: #1a5490;
-              border-bottom: 1px solid #1a5490;
-              padding-bottom: 5px;
-            }
-            .section-content {
-              font-size: 12px;
-              line-height: 1.8;
-            }
-            .section-content p {
-              margin: 5px 0;
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin-top: 10px;
-              font-size: 12px;
-            }
-            th { 
-              background: #1a5490; 
-              color: white;
-              padding: 10px 8px; 
-              text-align: left; 
-              border: 1px solid #ccc; 
-              font-weight: bold;
-            }
-            td { 
-              padding: 8px; 
-              border: 1px solid #ddd; 
-            }
-            tr:nth-child(even) {
-              background: #f9f9f9;
-            }
-            .total-row {
-              font-weight: bold; 
-              background: #e8f5e9;
-              color: #2e7d32;
-            }
-            .summary-section {
-              margin-top: 20px;
-              padding: 15px;
-              background: #e8f5e9;
-              border-left: 4px solid #2e7d32;
-              border-radius: 3px;
-            }
-            .summary-row {
-              display: flex;
-              justify-content: space-between;
-              margin: 8px 0;
-              font-size: 13px;
-            }
-            .summary-row.final {
-              font-size: 16px;
-              font-weight: bold;
-              color: #2e7d32;
-              border-top: 2px solid #2e7d32;
-              padding-top: 8px;
-            }
-            .footer { 
-              margin-top: 40px; 
-              padding-top: 20px; 
-              border-top: 1px solid #ddd; 
-              font-size: 11px; 
-              color: #666;
-              text-align: center;
-            }
-            .footer-note {
-              margin-top: 10px;
-              font-style: italic;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="document-container">
-            <!-- Top Bar with Logo, QR, Stamp and Sender -->
-            <div class="top-bar">
-              <div class="logo-section">
-                <img src="${logoUrl}" alt="" />
-                <div class="logo-text">Pigenovo Generate+Grow+Earn</div>
-              </div>
-              <div class="qr-section">
-                <img src="${qrCodeDataUrl}" alt="QR Code" />
-                <div class="qr-label">Scan to view</div>
-              </div>
-              ${stampSection}
-              ${senderSection}
-            </div>
-
-            <!-- Header Section -->
-            <div class="header-section">
-              <div class="title">INVOICE</div>
-              <div class="subtitle">Ref: <strong>${invoice.number}</strong> | Date: ${new Date(invoice.invoice_date).toLocaleDateString()}</div>
-            </div>
-
-            <!-- Bill To and Details -->
-            <div class="two-column">
-              <div class="column">
-                <div class="section-label">Bill To:</div>
-                <div class="section-content">
-                  <p><strong>${invoice.client_name}</strong></p>
-                  ${invoice.client_phone ? `<p>📱 ${invoice.client_phone}</p>` : ''}
-                  ${invoice.client_email ? `<p>✉️ ${invoice.client_email}</p>` : ''}
-                </div>
-              </div>
-              <div class="column">
-                <div class="section-label">Details:</div>
-                <div class="section-content">
-                  <p><strong>Date:</strong> ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
-                  ${invoice.due_date ? `<p><strong>Due Date:</strong> ${new Date(invoice.due_date).toLocaleDateString()}</p>` : ''}
-                  <p><strong>Status:</strong> ${invoice.status.toUpperCase()}</p>
-                  ${invoice.description ? `<p><strong>Desc:</strong> ${invoice.description}</p>` : ''}
-                </div>
-              </div>
-            </div>
-
-            <!-- Line Items Table -->
-            <table>
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th style="text-align: right;">Qty</th>
-                  <th style="text-align: right;">Unit Price</th>
-                  <th style="text-align: right;">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map(item => `
-                  <tr>
-                    <td>${item.description}</td>
-                    <td style="text-align: right;">${item.quantity}</td>
-                    <td style="text-align: right;">${item.unit_price.toLocaleString()}</td>
-                    <td style="text-align: right;">${item.amount.toLocaleString()}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-
-            <!-- Summary Section -->
-            <div class="summary-section">
-              <div class="summary-row">
-                <span>Subtotal:</span>
-                <span>${invoice.amount.toLocaleString()} ${invoice.currency}</span>
-              </div>
-              ${invoice.discount_rate && invoice.discount_rate > 0 ? `
-                <div class="summary-row">
-                  <span>Discount (${invoice.discount_rate}%):</span>
-                  <span style="color: #ff9800;">-${(invoice.discount_amount || 0).toLocaleString()} ${invoice.currency}</span>
-                </div>
-              ` : ''}
-              ${invoice.tax_rate && invoice.tax_rate > 0 ? `
-                <div class="summary-row">
-                  <span>Tax (${invoice.tax_rate}%):</span>
-                  <span style="color: #1976d2;">+${(invoice.tax_amount || 0).toLocaleString()} ${invoice.currency}</span>
-                </div>
-              ` : ''}
-              <div class="summary-row final">
-                <span>FINAL TOTAL:</span>
-                <span>${(invoice.total_amount || invoice.amount).toLocaleString()} ${invoice.currency}</span>
-              </div>
-            </div>
-
-            <!-- Footer -->
-            <div class="footer">
-              <p>This is an automatically generated invoice.</p>
-              <p class="footer-note">Generated on: ${new Date().toLocaleString()}</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
-
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Invoice-${invoice.number}.html`;
-      link.click();
-    } catch (error) {
-      console.error('Error generating invoice document:', error);
-      toast.error('Error generating document');
-    }
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Invoice-${invoice.number}.html`;
+    link.click();
   };
 
   const handleExportInvoice = async (invoice: Invoice, format: 'pdf' | 'image') => {
     try {
       await fetchInvoiceItems(invoice.id);
       // Use invoice items from state after fetch
-      setTimeout(async () => {
-        await generateInvoiceDocument(invoice, invoiceItems, format);
+      setTimeout(() => {
+        generateInvoiceDocument(invoice, invoiceItems, format);
       }, 100);
     } catch (error: any) {
       toast.error(error.message);
@@ -628,15 +241,13 @@ export function Invoices() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('wallets')
         .select('balance')
         .eq('user_id', user.id)
-        .maybeSingle(); // Use maybeSingle to handle case where wallet doesn't exist yet
+        .single();
 
-      if (error) {
-        console.error('Error fetching wallet:', error);
-      } else if (data) {
+      if (data) {
         setWalletBalance(Number(data.balance));
       }
     } catch (error) {
@@ -776,7 +387,7 @@ export function Invoices() {
     }
   };
 
-  const filteredInvoices = invoices.filter(inv =>
+  const filteredInvoices = invoices.filter((inv: Invoice) =>
     inv.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     inv.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -792,15 +403,15 @@ export function Invoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold">{t('invoices.title')}</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">{t('invoices.title')}</h1>
         <Button onClick={async () => {
           if (!showNew) {
             const nextNum = await generateNextInvoiceNumber();
-            setFormData(prev => ({ ...prev, number: nextNum }));
+            setFormData((prev: typeof formData) => ({ ...prev, number: nextNum }));
           }
           setShowNew(!showNew);
-        }} className="gap-2 w-full sm:w-auto">
+        }} className="gap-2">
           <Plus className="h-4 w-4" />
           {t('invoices.new')}
         </Button>
@@ -814,7 +425,7 @@ export function Invoices() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateInvoice} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>{t('invoices.number')}</Label>
                     <div className="p-2 border rounded bg-muted text-sm font-mono font-bold text-primary">
@@ -826,7 +437,7 @@ export function Invoices() {
                     <Label>{t('invoices.client_name')}</Label>
                     <Input
                       value={formData.client_name}
-                      onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, client_name: e.target.value })}
                       placeholder={t('invoices.client_name')}
                       required
                     />
@@ -835,7 +446,7 @@ export function Invoices() {
                     <Label>{t('invoices.client_phone')}</Label>
                     <Input
                       value={formData.client_phone}
-                      onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, client_phone: e.target.value })}
                       placeholder="+250..."
                     />
                   </div>
@@ -844,21 +455,21 @@ export function Invoices() {
                     <Input
                       type="number"
                       value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, amount: e.target.value })}
                       placeholder="0.00"
                       required
                     />
                   </div>
                   <div>
                     <Label>{t('invoices.date')}</Label>
-                    <Input type="date" onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })} />
+                    <Input type="date" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, invoice_date: e.target.value })} />
                   </div>
                   <div>
                     <Label>{t('invoices.due_date')}</Label>
                     <Input
                       type="date"
                       value={formData.due_date}
-                      onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, due_date: e.target.value })}
                     />
                   </div>
                 </div>
@@ -866,17 +477,17 @@ export function Invoices() {
                   <Label>{t('invoices.description')}</Label>
                   <textarea
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
                     placeholder={t('invoices.description')}
                     className="w-full p-2 border rounded"
                     rows={3}
                   />
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button type="submit" disabled={loading} className="flex-1">
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={loading}>
                     {t('common.save')}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowNew(false)} className="flex-1 sm:flex-none">
+                  <Button type="button" variant="outline" onClick={() => setShowNew(false)}>
                     {t('common.cancel')}
                   </Button>
                 </div>
@@ -914,12 +525,12 @@ export function Invoices() {
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
                 >
                   <div className="flex-1">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <div className="flex items-center gap-2">
                       {getStatusIcon(invoice.status)}
-                      <span className="font-mono font-bold text-xs sm:text-sm">{invoice.number}</span>
-                      <span className="text-xs sm:text-sm text-muted-foreground truncate">{invoice.client_name}</span>
+                      <span className="font-mono font-bold">{invoice.number}</span>
+                      <span className="text-sm text-muted-foreground">{invoice.client_name}</span>
                     </div>
-                    <div className="text-xs sm:text-sm text-muted-foreground mt-2">
+                    <div className="text-sm text-muted-foreground mt-1">
                       <div>
                         Subtotal: {invoice.amount.toLocaleString()} {invoice.currency}
                       </div>
@@ -940,22 +551,21 @@ export function Invoices() {
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1 md:gap-2">
+                  <div className="flex gap-2">
                     {invoice.status === 'draft' && (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handlePayFromWallet(invoice)}
                         disabled={loading}
-                        className="text-xs h-8"
                       >
-                        Pay
+                        {t('invoices.pay_from_wallet')}
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => {
                       setSelectedInvoice(invoice);
                       fetchInvoiceItems(invoice.id);
-                    }} title="Preview Invoice" className="h-8 w-8 p-0">
+                    }} title="Preview Invoice">
                       <Eye className="h-4 w-4" />
                     </Button>
                     <Button
@@ -963,7 +573,6 @@ export function Invoices() {
                       variant="ghost"
                       onClick={() => handleExportInvoice(invoice, 'pdf')}
                       title="Download as PDF"
-                      className="h-8 w-8 p-0"
                     >
                       <Download className="h-4 w-4 text-blue-500" />
                     </Button>
@@ -972,7 +581,6 @@ export function Invoices() {
                       variant="ghost"
                       onClick={() => handleExportInvoice(invoice, 'image')}
                       title="Download as Image"
-                      className="h-8 w-8 p-0"
                     >
                       <Printer className="h-4 w-4 text-green-500" />
                     </Button>
@@ -981,7 +589,6 @@ export function Invoices() {
                       variant="ghost"
                       onClick={() => handleDeleteInvoice(invoice.id)}
                       disabled={loading}
-                      className="h-8 w-8 p-0"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -998,63 +605,30 @@ export function Invoices() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedInvoice(null)}
         >
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg" onClick={(e) => e.stopPropagation()}>
-            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-xl sm:text-2xl truncate">Invoice: {selectedInvoice.number}</CardTitle>
-                <CardDescription className="truncate">{selectedInvoice.client_name}</CardDescription>
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Invoice: {selectedInvoice.number}</CardTitle>
+                <CardDescription>{selectedInvoice.client_name}</CardDescription>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setSelectedInvoice(null)} className="flex-shrink-0">✕</Button>
+              <Button variant="ghost" onClick={() => setSelectedInvoice(null)}>✕</Button>
             </CardHeader>
-            <CardContent className="space-y-6 p-4 sm:p-6">
-              {/* Sender Profile Section */}
-              {userProfile && (
-                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300 mb-3">📤 FROM (Sender Information)</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Name</p>
-                      <p className="font-semibold text-sm">{userProfile.full_name || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="font-semibold text-sm">{userProfile.email || 'N/A'}</p>
-                    </div>
-                    {userProfile.company_name && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Company</p>
-                        <p className="font-semibold text-sm">{userProfile.company_name}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-xs text-muted-foreground">Phone</p>
-                      <p className="font-semibold text-sm">{userProfile.phone_number || 'N/A'}</p>
-                    </div>
-                    {userProfile.tin_number && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">TIN</p>
-                        <p className="font-semibold text-sm">{userProfile.tin_number}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Bill To</p>
-                  <p className="font-bold mt-1">{selectedInvoice.client_name}</p>
-                  {selectedInvoice.client_phone && <p className="text-sm mt-1 break-words">{selectedInvoice.client_phone}</p>}
-                  {selectedInvoice.client_email && <p className="text-sm mt-1 break-words">{selectedInvoice.client_email}</p>}
+                  <p className="font-bold">{selectedInvoice.client_name}</p>
+                  {selectedInvoice.client_phone && <p className="text-sm">{selectedInvoice.client_phone}</p>}
+                  {selectedInvoice.client_email && <p className="text-sm">{selectedInvoice.client_email}</p>}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Invoice #</p>
-                  <p className="font-mono font-bold mt-1">{selectedInvoice.number}</p>
-                  <p className="text-xs text-muted-foreground mt-3">Status</p>
-                  <p className="text-xs px-2 py-1 rounded-full font-semibold w-fit bg-blue-100 text-blue-700 mt-1">
+                  <p className="font-mono font-bold">{selectedInvoice.number}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Status</p>
+                  <p className="text-xs px-2 py-1 rounded-full font-semibold w-fit bg-blue-100 text-blue-700">
                     {selectedInvoice.status.toUpperCase()}
                   </p>
                 </div>
@@ -1062,18 +636,17 @@ export function Invoices() {
 
               {invoiceItems.length > 0 && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-3">Line Items</p>
-                  <div className="overflow-x-auto -mx-4 sm:mx-0">
-                    <table className="w-full text-xs sm:text-sm border rounded min-w-[300px]">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="p-2 text-left">Description</th>
-                          <th className="p-2 text-right">Qty</th>
-                          <th className="p-2 text-right">Unit Price</th>
-                          <th className="p-2 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                  <p className="text-xs text-muted-foreground mb-2">Line Items</p>
+                  <table className="w-full text-sm border rounded">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="p-2 text-left">Description</th>
+                        <th className="p-2 text-right">Qty</th>
+                        <th className="p-2 text-right">Unit Price</th>
+                        <th className="p-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {invoiceItems.map((item, idx) => (
                         <tr key={idx} className="border-t">
                           <td className="p-2">{item.description}</td>
@@ -1085,7 +658,6 @@ export function Invoices() {
                     </tbody>
                   </table>
                 </div>
-              </div>
               )}
 
               {/* Tax and Discount Display */}

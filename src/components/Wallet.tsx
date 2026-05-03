@@ -1,6 +1,5 @@
   import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,8 +32,6 @@ export function Wallet({ user }: { user: any }) {
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('');
   const [details, setDetails] = useState('');
-  const [totalProformaCharges, setTotalProformaCharges] = useState(0); // Export + Send fees
-  const [chargesBreakdown, setChargesBreakdown] = useState({ export_fee: 0, send_fee: 0 });
 
   useEffect(() => {
     fetchWallet();
@@ -150,21 +147,6 @@ export function Wallet({ user }: { user: any }) {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     setTransactions(data || []);
-    
-    // Calculate proforma charges breakdown
-    if (data) {
-      const exportFees = data
-        .filter((tx: any) => tx.method === 'export_fee' && tx.status === 'approved')
-        .reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
-      
-      const sendFees = data
-        .filter((tx: any) => tx.method === 'send_fee' && tx.status === 'approved')
-        .reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
-      
-      setChargesBreakdown({ export_fee: exportFees, send_fee: sendFees });
-      setTotalProformaCharges(exportFees + sendFees);
-    }
-    
     setLoading(false);
     fetchEarnedBalance(); // Recalculate earned balance
   };
@@ -296,9 +278,8 @@ export function Wallet({ user }: { user: any }) {
 
       if (insertError) throw insertError;
 
-      // 2. If approved, update balance immediately
-      // Deposits: add funds | Withdrawals: deduct funds
-      if (status === 'approved') {
+      // 2. If approved deposit OR withdrawal, update balance
+      if (status === 'approved' || action === 'withdraw') {
         const { data: wallet } = await supabase
           .from('wallets')
           .select('balance')
@@ -306,9 +287,7 @@ export function Wallet({ user }: { user: any }) {
           .single();
 
         const currentBalance = Number(wallet?.balance) || 0;
-        const newBalance = action === 'deposit' 
-          ? currentBalance + rwfAmount 
-          : currentBalance - rwfAmount;
+        const newBalance = status === 'approved' ? currentBalance + rwfAmount : currentBalance - rwfAmount;
 
         const { error: walletError } = await supabase
           .from('wallets')
@@ -320,7 +299,7 @@ export function Wallet({ user }: { user: any }) {
       }
 
       if (status === 'approved') {
-        toast.success(`Successfully ${action === 'deposit' ? 'added' : 'withdrawn'} ${rwfAmount.toLocaleString()} RWF ${action === 'deposit' ? 'to' : 'from'} your wallet!`);
+        toast.success(`Successfully credited ${rwfAmount.toLocaleString()} RWF to your wallet!`);
       } else {
         toast.success(`${action === 'deposit' ? 'Deposit' : 'Withdrawal'} request submitted! Waiting for admin approval.`);
       }
@@ -370,27 +349,6 @@ export function Wallet({ user }: { user: any }) {
                   Transfer to Main Wallet
                 </Button>
               )}
-            </div>
-
-            {/* Proforma Charges Spent */}
-            <div className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
-              <div className="text-xs font-bold text-orange-700 dark:text-orange-200 uppercase tracking-wider mb-2">📤 Export Charges</div>
-              <div className="text-xl font-bold text-orange-900 dark:text-orange-100">{chargesBreakdown.export_fee.toLocaleString()} RWF</div>
-              <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Spent on exports</p>
-            </div>
-
-            {/* Send Charges */}
-            <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
-              <div className="text-xs font-bold text-purple-700 dark:text-purple-200 uppercase tracking-wider mb-2">📧 Send Charges</div>
-              <div className="text-xl font-bold text-purple-900 dark:text-purple-100">{chargesBreakdown.send_fee.toLocaleString()} RWF</div>
-              <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">Spent on sends</p>
-            </div>
-
-            {/* Total Proforma Charges */}
-            <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
-              <div className="text-xs font-bold text-red-700 dark:text-red-200 uppercase tracking-wider mb-2">💳 Total Platform Charges</div>
-              <div className="text-2xl font-bold text-red-900 dark:text-red-100">{totalProformaCharges.toLocaleString()} RWF</div>
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Export + Send fees</p>
             </div>
 
             {/* Total Balance */}
@@ -596,55 +554,25 @@ export function Wallet({ user }: { user: any }) {
                 <p className="text-sm">No transactions found.</p>
               </div>
             ) : (
-              transactions.map((tx) => {
-                // Helper to get method label with emoji
-                const getMethodLabel = (method: string) => {
-                  const labels: Record<string, string> = {
-                    'export_fee': '📤 Proforma Export',
-                    'send_fee': '📧 Proforma Send',
-                    'rwf_momo': 'MoMo Transfer',
-                    'pi_network': '🟡 Pi Network',
-                    'usdt': '💵 USDT',
-                    'bank_transfer': '🏦 Bank Transfer',
-                    'earnings_transfer': '⭐ Earnings Transfer',
-                    'withdrawal': '💸 Withdrawal',
-                    'deposit': '💰 Deposit'
-                  };
-                  return labels[method] || method.replace('_', ' ');
-                };
-
-                return (
+              transactions.map((tx) => (
                 <div key={tx.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border">
                   <div className="flex items-center gap-4">
                     <div className={cn(
                       "p-3 rounded-full",
-                      (tx.method === 'export_fee' || tx.method === 'send_fee') ? "bg-orange-500/10 text-orange-600" :
                       tx.type === 'deposit' ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
                     )}>
-                      {(tx.method === 'export_fee' || tx.method === 'send_fee') ? <Coins className="h-5 w-5" /> :
-                       tx.type === 'deposit' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                      {tx.type === 'deposit' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
                     </div>
                     <div>
                       <div className="font-bold flex items-center gap-2 uppercase text-xs">
-                        {getMethodLabel(tx.method)}
+                        {tx.type} via {tx.method.replace('_', ' ')}
                         {tx.status === 'pending' && <span className="bg-yellow-500/10 text-yellow-600 px-1.5 py-0.5 rounded text-[8px]">PENDING</span>}
                         {tx.status === 'approved' && <span className="bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded text-[8px]">COMPLETED</span>}
                         {tx.status === 'rejected' && <span className="bg-red-500/10 text-red-600 px-1.5 py-0.5 rounded text-[8px]">REJECTED</span>}
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                        {new Date(tx.created_at).toLocaleString()} 
-                        {tx.details?.note && ` | ${tx.details.note}`}
+                        {new Date(tx.created_at).toLocaleString()} | {tx.details?.note}
                       </div>
-                      {tx.details?.proforma_id && (
-                        <div className="text-[9px] text-muted-foreground mt-1 flex items-center gap-2">
-                          📋 Proforma ID: <span className="font-mono text-[8px]">{tx.details.proforma_id.substring(0, 8)}</span>
-                        </div>
-                      )}
-                      {tx.details?.description && (
-                        <div className="text-[9px] text-muted-foreground mt-1">
-                          {tx.details.description}
-                        </div>
-                      )}
                       {tx.details?.user_phone && (
                         <div className="text-[9px] text-muted-foreground mt-1 flex items-center gap-1">
                           <span className="text-sm">{tx.details.user_phone_flag}</span>
@@ -657,20 +585,21 @@ export function Wallet({ user }: { user: any }) {
                   <div className="text-right">
                     <div className={cn(
                       "font-mono font-bold",
-                      (tx.method === 'export_fee' || tx.method === 'send_fee') ? "text-orange-600" :
                       tx.type === 'deposit' ? "text-green-600" : "text-red-600"
                     )}>
-                      {(tx.method === 'export_fee' || tx.method === 'send_fee') ? '-' : 
-                       tx.type === 'deposit' ? '+' : '-'}{tx.amount.toLocaleString()} <span className="text-[10px] font-normal">{tx.currency}</span>
+                      {tx.type === 'deposit' ? '+' : '-'}{tx.amount.toLocaleString()} <span className="text-[10px] font-normal">{tx.currency}</span>
                     </div>
                   </div>
                 </div>
-              );
-              })
+              ))
             )}
           </div>
         </CardContent>
       </Card>
     </div>
   );
+}
+
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ');
 }
