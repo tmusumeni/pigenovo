@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
-import { Plus, Download, Send, CheckCircle, XCircle, ArrowRight, Trash2, Eye, Edit2, FileDown, Image as ImageIcon, Inbox } from 'lucide-react';
+import { Plus, Download, Send, CheckCircle, XCircle, ArrowRight, Trash2, Eye, Edit2, FileDown, Image as ImageIcon, Inbox, Upload } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomerSelector } from '@/components/CustomerSelector';
 import { CustomerModal } from '@/components/CustomerModal';
@@ -37,6 +37,8 @@ interface Proforma {
   recipient_status?: string;
   viewed_by_client?: boolean;
   created_at: string;
+  stamp_url?: string;
+  stamp_uploaded_at?: string;
 }
 
 interface ProformaItem {
@@ -94,6 +96,11 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     quantity: 1,
     unit_price: 0,
   });
+
+  // Stamp upload state
+  const [stampFile, setStampFile] = useState<File | null>(null);
+  const [stampPreview, setStampPreview] = useState<string | null>(null);
+  const [stampUploading, setStampUploading] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -361,6 +368,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       // Calculate total with tax and discount
       const totals = calculateTotalWithTaxAndDiscount();
 
+      // Upload stamp if selected
+      let stampUrl = null;
+      if (stampFile) {
+        stampUrl = await uploadStamp();
+      }
+
       // Create new proforma
       const { data: proformaData, error: proformaError } = await supabase
         .from('proformas')
@@ -374,7 +387,9 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           currency: formData.currency,
           description: formData.description,
           valid_until: formData.valid_until || null,
-          status: 'draft'
+          status: 'draft',
+          stamp_url: stampUrl,
+          stamp_uploaded_at: stampUrl ? new Date().toISOString() : null
         }])
         .select()
         .single();
@@ -640,6 +655,67 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setLineItems(lineItems.filter((_: ProformaItem, i: number) => i !== index));
   };
 
+  // Stamp upload functions
+  const handleStampFileSelect = (file: File) => {
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setStampFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setStampPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadStamp = async (): Promise<string | null> => {
+    if (!stampFile || !currentUser) return null;
+
+    setStampUploading(true);
+    try {
+      const fileExt = stampFile.name.split('.').pop();
+      const fileName = `stamp_${Date.now()}.${fileExt}`;
+      const filePath = `stamps/${currentUser.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('proforma-stamps')
+        .upload(filePath, stampFile);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('Failed to upload stamp');
+        return null;
+      }
+
+      const { data } = supabase.storage
+        .from('proforma-stamps')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Stamp upload error:', error);
+      toast.error('Failed to upload stamp');
+      return null;
+    } finally {
+      setStampUploading(false);
+    }
+  };
+
+  const handleRemoveStamp = () => {
+    setStampFile(null);
+    setStampPreview(null);
+  };
+
   const calculateGrandTotal = () => {
     return lineItems.reduce((sum: number, item: ProformaItem) => sum + (item.quantity * item.unit_price), 0);
   };
@@ -675,6 +751,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setLineItems([]);
     setCurrentItem({ description: '', quantity: 1, unit_price: 0 } as ProformaItem);
     setSelectedCustomer(null);
+    setStampFile(null);
+    setStampPreview(null);
   };
 
   // Helper function to calculate totals from a proforma object
@@ -1371,6 +1449,71 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Stamp Upload Section */}
+                <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+                  <Label className="text-sm font-semibold mb-3 block">🔖 Company Stamp/Logo (Optional)</Label>
+                  <div className="space-y-3">
+                    {!stampPreview ? (
+                      <div
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 transition-colors"
+                        onClick={() => document.getElementById('stamp-file-input')?.click()}
+                      >
+                        <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600">
+                          Click to upload stamp/logo image
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          PNG, JPG up to 5MB
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4">
+                        <img
+                          src={stampPreview}
+                          alt="Stamp preview"
+                          className="h-16 w-16 object-contain border rounded"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{stampFile?.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(stampFile?.size || 0) / 1024 / 1024 < 1
+                              ? `${Math.round((stampFile?.size || 0) / 1024)} KB`
+                              : `${((stampFile?.size || 0) / 1024 / 1024).toFixed(1)} MB`
+                            }
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRemoveStamp}
+                          disabled={stampUploading}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                    <input
+                      id="stamp-file-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleStampFileSelect(file);
+                        }
+                      }}
+                    />
+                    {stampUploading && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        Uploading stamp...
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-2">

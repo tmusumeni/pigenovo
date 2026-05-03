@@ -226,8 +226,8 @@ RETURNS TABLE (
   description text,
   amount numeric,
   currency text,
-  proforma_date timestamp,
-  valid_until timestamp,
+  proforma_date timestamptz,
+  valid_until timestamptz,
   tax_rate numeric,
   discount_rate numeric,
   tax_amount numeric,
@@ -238,7 +238,9 @@ RETURNS TABLE (
   sent_date timestamp,
   viewed_date timestamp,
   recipient_status text,
-  created_at timestamp
+  created_at timestamptz,
+  stamp_url text,
+  stamp_uploaded_at timestamptz
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -263,7 +265,9 @@ BEGIN
     pr.sent_date,
     pr.viewed_date,
     pr.status as recipient_status,
-    p.created_at
+    p.created_at,
+    p.stamp_url,
+    p.stamp_uploaded_at
   FROM proformas p
   INNER JOIN proforma_recipients pr ON p.id = pr.proforma_id
   WHERE pr.receiver_user_id = p_receiver_user_id
