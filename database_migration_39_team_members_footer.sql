@@ -1,5 +1,10 @@
+-- Drop existing tables if they exist (clean slate)
+DROP TABLE IF EXISTS join_team_settings CASCADE;
+DROP TABLE IF EXISTS footer_content CASCADE;
+DROP TABLE IF EXISTS team_members CASCADE;
+
 -- Create team_members table
-CREATE TABLE IF NOT EXISTS team_members (
+CREATE TABLE team_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   role VARCHAR(255) NOT NULL,
@@ -15,7 +20,7 @@ CREATE TABLE IF NOT EXISTS team_members (
 );
 
 -- Create footer_content table
-CREATE TABLE IF NOT EXISTS footer_content (
+CREATE TABLE footer_content (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   section_key VARCHAR(100) NOT NULL UNIQUE,
   section_title VARCHAR(255) NOT NULL,
@@ -28,7 +33,7 @@ CREATE TABLE IF NOT EXISTS footer_content (
 );
 
 -- Create join_team_settings table for "Join Our Team" section
-CREATE TABLE IF NOT EXISTS join_team_settings (
+CREATE TABLE join_team_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title VARCHAR(255) NOT NULL DEFAULT 'Join Our Team',
   description TEXT,
