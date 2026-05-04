@@ -12,6 +12,8 @@ import { Invoices } from './Invoices';
 import { Reports } from './Reports';
 import { LanguageSelector } from './LanguageSelector';
 import { RealtimeFeed } from './RealtimeFeed';
+import { DashboardFooter } from './DashboardFooter';
+import { TeamMembers } from './TeamMembers';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, Search, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -139,6 +141,9 @@ export function Dashboard({ user }: { user: any }) {
             </motion.div>
           </AnimatePresence>
         </main>
+
+        <TeamMembers />
+        <DashboardFooter />
       </div>
     </div>
   );
