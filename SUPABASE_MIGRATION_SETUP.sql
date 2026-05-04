@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS team_members (
   name VARCHAR(255) NOT NULL,
   role VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
-  avatar TEXT, -- URL to profile picture
+  avatar TEXT,
   bio TEXT,
   linkedin_url TEXT,
   twitter_url TEXT,
@@ -70,10 +70,10 @@ CREATE POLICY "Allow admin manage join_team_settings" ON join_team_settings
 -- Insert default team members
 INSERT INTO team_members (name, role, email, avatar, bio, position_order)
 VALUES
-  ('Themba Musumeni', 'Lead Developer & Founder', 'themba@pigenovo.st', NULL, 'Full-stack developer with expertise in React, TypeScript, and blockchain integration', 1),
-  ('Alex Johnson', 'Product Manager', 'alex@pigenovo.st', NULL, 'Passionate about user experience and building products that traders love', 2),
-  ('Sarah Chen', 'Smart Contract Engineer', 'sarah@pigenovo.st', NULL, 'Blockchain specialist ensuring secure and efficient smart contract deployment', 3),
-  ('Marcus Williams', 'DevOps & Infrastructure', 'marcus@pigenovo.st', NULL, 'Ensuring platform reliability, security, and scalability for millions of users', 4)
+  ('Themba Musumeni', 'Lead Developer & Founder', 'themba@pigenovo.st', '👨‍💻', 'Full-stack developer with expertise in React, TypeScript, and blockchain integration', 1),
+  ('Alex Johnson', 'Product Manager', 'alex@pigenovo.st', '👨‍💼', 'Passionate about user experience and building products that traders love', 2),
+  ('Sarah Chen', 'Smart Contract Engineer', 'sarah@pigenovo.st', '👩‍💻', 'Blockchain specialist ensuring secure and efficient smart contract deployment', 3),
+  ('Marcus Williams', 'DevOps & Infrastructure', 'marcus@pigenovo.st', '👨‍🔧', 'Ensuring platform reliability, security, and scalability for millions of users', 4)
 ON CONFLICT DO NOTHING;
 
 -- Insert default footer content

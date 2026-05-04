@@ -92,8 +92,18 @@ export function TeamMembers() {
                   key={member.id}
                   className="group rounded-lg border bg-card/50 p-6 hover:bg-card hover:border-primary/50 transition-all duration-300 hover:shadow-lg"
                 >
-                  <div className="text-6xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
-                    {member.avatar}
+                  <div className="w-full h-32 mb-4 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                    {member.avatar ? (
+                      <img 
+                        src={member.avatar} 
+                        alt={member.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="text-5xl text-muted-foreground font-bold">
+                        {member.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   
                   <h3 className="text-lg font-semibold mb-1 text-foreground">{member.name}</h3>

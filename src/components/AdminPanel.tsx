@@ -53,6 +53,9 @@ export function AdminPanel() {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [newTeamMember, setNewTeamMember] = useState<any>({ name: '', role: '', email: '', avatar: '', bio: '' });
   const [editingTeamMember, setEditingTeamMember] = useState<any>(null);
+  const [teamAvatarFile, setTeamAvatarFile] = useState<File | null>(null);
+  const [teamAvatarPreview, setTeamAvatarPreview] = useState<string>('');
+  const [teamAvatarUploading, setTeamAvatarUploading] = useState(false);
   
   // Footer Content Management
   const [footerContent, setFooterContent] = useState<any[]>([]);
@@ -1043,21 +1046,63 @@ export function AdminPanel() {
     }
 
     setLoading(true);
+    setTeamAvatarUploading(true);
     try {
+      let avatarUrl = '';
+
+      // Upload avatar image if provided
+      if (teamAvatarFile) {
+        const fileExt = teamAvatarFile.name.split('.').pop();
+        const fileName = `team-avatar-${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('proofs')
+          .upload(fileName, teamAvatarFile);
+
+        if (uploadError) {
+          console.error('Upload Error:', uploadError);
+          throw new Error('Failed to upload avatar: ' + uploadError.message);
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('proofs')
+          .getPublicUrl(fileName);
+
+        avatarUrl = urlData.publicUrl;
+      }
+
       const { error } = await supabase.from('team_members').insert({
         ...newTeamMember,
+        avatar: avatarUrl || null,
         position_order: teamMembers.length + 1
       });
 
       if (error) throw error;
       toast.success('Team member added successfully');
       setNewTeamMember({ name: '', role: '', email: '', avatar: '', bio: '' });
+      setTeamAvatarFile(null);
+      setTeamAvatarPreview('');
       fetchTeamMembers();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
       setLoading(false);
+      setTeamAvatarUploading(false);
     }
+  };
+
+  const handleTeamAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setTeamAvatarFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setTeamAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleUpdateTeamMember = async (e: React.FormEvent) => {
@@ -2488,13 +2533,20 @@ export function AdminPanel() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="tm-avatar">Avatar Emoji</Label>
+                    <Label htmlFor="tm-avatar">Profile Picture</Label>
+                    {teamAvatarPreview && (
+                      <div className="w-full h-32 rounded-lg overflow-hidden bg-muted mb-2">
+                        <img src={teamAvatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
                     <Input 
                       id="tm-avatar"
-                      placeholder="👨‍💻"
-                      value={newTeamMember.avatar}
-                      onChange={(e) => setNewTeamMember({ ...newTeamMember, avatar: e.target.value })}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleTeamAvatarChange}
+                      disabled={teamAvatarUploading}
                     />
+                    <p className="text-xs text-muted-foreground">JPG, PNG or WebP. Max 5MB.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="tm-bio">Bio</Label>
@@ -2522,10 +2574,17 @@ export function AdminPanel() {
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {teamMembers.map((member: any) => (
                     <div key={member.id} className="p-3 border rounded-lg hover:bg-muted/50">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium">{member.name}</p>
-                          <p className="text-xs text-muted-foreground">{member.role}</p>
+                      <div className="flex items-start gap-3 justify-between">
+                        <div className="flex items-start gap-2 flex-1">
+                          {member.avatar && (
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                              <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium text-sm">{member.name}</p>
+                            <p className="text-xs text-muted-foreground">{member.role}</p>
+                          </div>
                         </div>
                         <button
                           onClick={() => handleDeleteTeamMember(member.id)}
