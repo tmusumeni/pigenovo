@@ -49,6 +49,16 @@ export function AdminPanel() {
   const [exchangeRates, setExchangeRates] = useState<any>({ usdt_rwf: 1300, pi_rwf: 45000 });
   const [stats, setStats] = useState<any>({ totalVolume: 0, totalFees: 0, totalTrades: 0, totalUsers: 0, totalEarnings: 0, totalWalletBalance: 0 });
   
+  // Team Members Management
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [newTeamMember, setNewTeamMember] = useState<any>({ name: '', role: '', email: '', avatar: '', bio: '' });
+  const [editingTeamMember, setEditingTeamMember] = useState<any>(null);
+  
+  // Footer Content Management
+  const [footerContent, setFooterContent] = useState<any[]>([]);
+  const [joinTeamSettings, setJoinTeamSettings] = useState<any>({ title: '', description: '', button_text: '', button_link: '' });
+  const [editingFooterItem, setEditingFooterItem] = useState<any>(null);
+  
   // Market Form
   const [newName, setNewName] = useState('');
   const [newScore, setNewScore] = useState('');
@@ -98,6 +108,9 @@ export function AdminPanel() {
     fetchProformaCharge();
     fetchAllProfiles();
     fetchAllTrades();
+    fetchTeamMembers();
+    fetchFooterContent();
+    fetchJoinTeamSettings();
     fetchUserWalletData();
     fetchPlatformWallet();
     fetchPlatformEarnings();
@@ -1007,6 +1020,153 @@ export function AdminPanel() {
     }
   };
 
+  // Team Members Functions
+  const fetchTeamMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .order('position_order', { ascending: true });
+      
+      if (error) throw error;
+      setTeamMembers(data || []);
+    } catch (error: any) {
+      console.error('Error fetching team members:', error);
+    }
+  };
+
+  const handleAddTeamMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeamMember.name || !newTeamMember.role || !newTeamMember.email) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('team_members').insert({
+        ...newTeamMember,
+        position_order: teamMembers.length + 1
+      });
+
+      if (error) throw error;
+      toast.success('Team member added successfully');
+      setNewTeamMember({ name: '', role: '', email: '', avatar: '', bio: '' });
+      fetchTeamMembers();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateTeamMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTeamMember.id) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update(editingTeamMember)
+        .eq('id', editingTeamMember.id);
+
+      if (error) throw error;
+      toast.success('Team member updated successfully');
+      setEditingTeamMember(null);
+      fetchTeamMembers();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTeamMember = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this team member?')) return;
+
+    try {
+      const { error } = await supabase.from('team_members').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Team member deleted');
+      fetchTeamMembers();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  // Footer Content Functions
+  const fetchFooterContent = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('footer_content')
+        .select('*')
+        .order('display_order', { ascending: true });
+      
+      if (error) throw error;
+      setFooterContent(data || []);
+    } catch (error: any) {
+      console.error('Error fetching footer content:', error);
+    }
+  };
+
+  const fetchJoinTeamSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('join_team_settings')
+        .select('*')
+        .limit(1)
+        .single();
+      
+      if (error) throw error;
+      setJoinTeamSettings(data);
+    } catch (error: any) {
+      console.error('Error fetching join team settings:', error);
+    }
+  };
+
+  const handleUpdateFooterItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFooterItem.id) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('footer_content')
+        .update(editingFooterItem)
+        .eq('id', editingFooterItem.id);
+
+      if (error) throw error;
+      toast.success('Footer content updated');
+      setEditingFooterItem(null);
+      fetchFooterContent();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateJoinTeamSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('join_team_settings')
+        .update(joinTeamSettings)
+        .eq('id', joinTeamSettings.id);
+
+      if (error) throw error;
+      toast.success('Join Team settings updated');
+      fetchJoinTeamSettings();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1">
@@ -1140,6 +1300,8 @@ export function AdminPanel() {
             💰 Wallet Analytics
           </TabsTrigger>
           <TabsTrigger value="users" className="rounded-lg">Users</TabsTrigger>
+          <TabsTrigger value="team" className="rounded-lg">👥 Team Members</TabsTrigger>
+          <TabsTrigger value="footer" className="rounded-lg">🔗 Footer Content</TabsTrigger>
           <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
         </TabsList>
 
@@ -2285,6 +2447,216 @@ export function AdminPanel() {
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="team" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Add Team Member</CardTitle>
+                <CardDescription>Add a new team member to the company profile.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleAddTeamMember} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tm-name">Name *</Label>
+                    <Input 
+                      id="tm-name"
+                      placeholder="Full name"
+                      value={newTeamMember.name}
+                      onChange={(e) => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tm-role">Role *</Label>
+                    <Input 
+                      id="tm-role"
+                      placeholder="Job title"
+                      value={newTeamMember.role}
+                      onChange={(e) => setNewTeamMember({ ...newTeamMember, role: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tm-email">Email *</Label>
+                    <Input 
+                      id="tm-email"
+                      placeholder="email@example.com"
+                      value={newTeamMember.email}
+                      onChange={(e) => setNewTeamMember({ ...newTeamMember, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tm-avatar">Avatar Emoji</Label>
+                    <Input 
+                      id="tm-avatar"
+                      placeholder="👨‍💻"
+                      value={newTeamMember.avatar}
+                      onChange={(e) => setNewTeamMember({ ...newTeamMember, avatar: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tm-bio">Bio</Label>
+                    <textarea 
+                      id="tm-bio"
+                      placeholder="Short bio"
+                      className="w-full px-3 py-2 border rounded-md"
+                      value={newTeamMember.bio}
+                      onChange={(e) => setNewTeamMember({ ...newTeamMember, bio: e.target.value })}
+                    />
+                  </div>
+                  <Button type="submit" disabled={loading} className="w-full">
+                    {loading ? 'Adding...' : 'Add Team Member'}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Team Members List ({teamMembers.length})</CardTitle>
+                <CardDescription>View and edit existing team members.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {teamMembers.map((member: any) => (
+                    <div key={member.id} className="p-3 border rounded-lg hover:bg-muted/50">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium">{member.name}</p>
+                          <p className="text-xs text-muted-foreground">{member.role}</p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteTeamMember(member.id)}
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="footer" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Footer Content</CardTitle>
+                <CardDescription>Manage footer section content.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {footerContent.map((item: any) => (
+                    <div key={item.id} className="p-3 border rounded-lg space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{item.section_title}</p>
+                          <p className="text-xs text-muted-foreground">Key: {item.section_key}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setEditingFooterItem(item)}
+                        className="text-xs text-primary hover:text-primary/80 font-medium"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Edit Footer Item</CardTitle>
+                <CardDescription>Update selected footer content.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {editingFooterItem ? (
+                  <form onSubmit={handleUpdateFooterItem} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fc-title">Title</Label>
+                      <Input 
+                        id="fc-title"
+                        value={editingFooterItem.section_title}
+                        onChange={(e) => setEditingFooterItem({ ...editingFooterItem, section_title: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fc-content">Content</Label>
+                      <textarea 
+                        id="fc-content"
+                        className="w-full px-3 py-2 border rounded-md"
+                        value={editingFooterItem.content}
+                        onChange={(e) => setEditingFooterItem({ ...editingFooterItem, content: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="submit" disabled={loading} className="flex-1">
+                        {loading ? 'Updating...' : 'Update'}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setEditingFooterItem(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <p className="text-muted-foreground text-sm">Select a footer item to edit</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Join Our Team Section</CardTitle>
+              <CardDescription>Configure the "Join Our Team" call-to-action.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpdateJoinTeamSettings} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="jt-title">Section Title</Label>
+                  <Input 
+                    id="jt-title"
+                    value={joinTeamSettings.title}
+                    onChange={(e) => setJoinTeamSettings({ ...joinTeamSettings, title: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jt-description">Description</Label>
+                  <textarea 
+                    id="jt-description"
+                    className="w-full px-3 py-2 border rounded-md"
+                    value={joinTeamSettings.description}
+                    onChange={(e) => setJoinTeamSettings({ ...joinTeamSettings, description: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jt-button-text">Button Text</Label>
+                  <Input 
+                    id="jt-button-text"
+                    value={joinTeamSettings.button_text}
+                    onChange={(e) => setJoinTeamSettings({ ...joinTeamSettings, button_text: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jt-button-link">Button Link</Label>
+                  <Input 
+                    id="jt-button-link"
+                    placeholder="https://example.com"
+                    value={joinTeamSettings.button_link}
+                    onChange={(e) => setJoinTeamSettings({ ...joinTeamSettings, button_link: e.target.value })}
+                  />
+                </div>
+                <Button type="submit" disabled={loading} className="w-full">
+                  {loading ? 'Updating...' : 'Update Settings'}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
