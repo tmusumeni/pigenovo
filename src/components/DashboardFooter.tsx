@@ -165,7 +165,6 @@ export function DashboardFooter() {
                   &copy; {currentYear} {getContentByKey('footer_copyright')?.content || 'PigEvoST. All rights reserved.'}
                 </p>
                 <div className="flex gap-4">
-                  <span className="text-xs text-muted-foreground">Version 2.0</span>
                   <span className="text-xs text-muted-foreground">Built with ❤️ for traders</span>
                 </div>
               </div>

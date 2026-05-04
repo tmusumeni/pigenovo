@@ -69,7 +69,7 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
         <div className="bg-primary text-primary-foreground p-2 rounded-xl">
           <Zap className="h-6 w-6" />
         </div>
-        <span className="font-bold text-xl tracking-tighter">PiGenovo 2.0</span>
+        <span className="font-bold text-xl tracking-tighter">PiGenovo</span>
       </div>
 
       <nav className="flex-1 px-4 space-y-1">

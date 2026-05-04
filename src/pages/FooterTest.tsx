@@ -1,9 +1,9 @@
 import React from 'react';
 import { Heart, Mail, Phone, MapPin, Facebook, Twitter, Linkedin } from 'lucide-react';
-import logoImage from '@/assets/images/logo.png';
 
 export function FooterTest() {
   const currentYear = new Date().getFullYear();
+  const logoUrl = 'https://vcyxtkfpwixgeiymrozg.supabase.co/storage/v1/object/public/Profiles/ChatGPT%20Image%20Apr%2028,%202026,%2006_33_24%20PM.png';
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -24,7 +24,7 @@ export function FooterTest() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <img 
-                  src={logoImage} 
+                  src={logoUrl} 
                   alt="PiGenovo" 
                   className="h-8 w-8 object-contain"
                 />
