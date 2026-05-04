@@ -195,12 +195,31 @@ export function Invoices() {
       </html>
     `;
 
+    // Create blob and download
     const blob = new Blob([html], { type: 'text/html' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Invoice-${invoice.number}.html`;
+    
+    // Generate filename
+    const baseFilename = `Invoice-${invoice.number}`;
+    link.download = `${baseFilename}.html`;
     link.click();
+    
+    // Show file path feedback
+    const userDownloadsPath = 'C:\\Users\\GISENYIHITS\\Downloads';
+    const fileUrl = `file:///${userDownloadsPath.replace(/\\/g, '/')}/${link.download}`;
+    
+    toast.success(`Invoice exported: ${fileUrl}`, {
+      duration: 5,
+      action: {
+        label: 'Copy Path',
+        onClick: () => {
+          navigator.clipboard.writeText(fileUrl);
+          toast.success('File path copied to clipboard');
+        }
+      }
+    });
   };
 
   const handleExportInvoice = async (invoice: Invoice, format: 'pdf' | 'image') => {

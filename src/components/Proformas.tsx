@@ -1185,23 +1185,31 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       </html>
     `;
 
-    if (format === 'pdf') {
-      // Create PDF using html2canvas + jspdf (fallback: download as HTML)
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Proforma-${proforma.number}.html`;
-      link.click();
-    } else {
-      // For image, we'll use html2canvas if available, otherwise show preview
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Proforma-${proforma.number}.html`;
-      link.click();
-    }
+    // Create blob and download
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Generate filename with auto-numbering
+    const baseFilename = `Proforma-${proforma.number}`;
+    link.download = `${baseFilename}.html`;
+    link.click();
+    
+    // Show file path feedback
+    const userDownloadsPath = 'C:\\Users\\GISENYIHITS\\Downloads';
+    const fileUrl = `file:///${userDownloadsPath.replace(/\\/g, '/')}/${link.download}`;
+    
+    toast.success(`Proforma exported: ${fileUrl}`, {
+      duration: 5,
+      action: {
+        label: 'Copy Path',
+        onClick: () => {
+          navigator.clipboard.writeText(fileUrl);
+          toast.success('File path copied to clipboard');
+        }
+      }
+    });
   };
 
   const filteredProformas = proformas.filter(p =>
