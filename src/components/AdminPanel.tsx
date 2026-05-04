@@ -59,6 +59,7 @@ export function AdminPanel() {
   
   // Footer Content Management
   const [footerContent, setFooterContent] = useState<any[]>([]);
+  const [newFooterItem, setNewFooterItem] = useState<any>({ section_key: '', section_title: '', content: '', link_url: '', display_order: 0, is_active: true });
   const [joinTeamSettings, setJoinTeamSettings] = useState<any>({ title: '', description: '', button_text: '', button_link: '' });
   const [editingFooterItem, setEditingFooterItem] = useState<any>(null);
   
@@ -1172,7 +1173,7 @@ export function AdminPanel() {
 
   const handleUpdateFooterItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingFooterItem.id) return;
+    if (!editingFooterItem?.id) return;
 
     setLoading(true);
     try {
@@ -1184,6 +1185,48 @@ export function AdminPanel() {
       if (error) throw error;
       toast.success('Footer content updated');
       setEditingFooterItem(null);
+      fetchFooterContent();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddFooterItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFooterItem.section_key || !newFooterItem.section_title) {
+      toast.error('Section key and title are required');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('footer_content').insert({
+        ...newFooterItem,
+        display_order: Number(newFooterItem.display_order || footerContent.length + 1)
+      });
+
+      if (error) throw error;
+      toast.success('New footer item added');
+      setNewFooterItem({ section_key: '', section_title: '', content: '', link_url: '', display_order: footerContent.length + 1, is_active: true });
+      fetchFooterContent();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteFooterItem = async (id: string) => {
+    if (!confirm('Remove this footer item?')) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('footer_content').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Footer item deleted');
+      if (editingFooterItem?.id === id) setEditingFooterItem(null);
       fetchFooterContent();
     } catch (error: any) {
       toast.error(error.message);
@@ -2602,73 +2645,162 @@ export function AdminPanel() {
         </TabsContent>
 
         <TabsContent value="footer" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            <Card className="xl:col-span-2">
               <CardHeader>
                 <CardTitle>Footer Content</CardTitle>
-                <CardDescription>Manage footer section content.</CardDescription>
+                <CardDescription>Manage content sections rendered in the site footer.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {footerContent.map((item: any) => (
-                    <div key={item.id} className="p-3 border rounded-lg space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-sm">{item.section_title}</p>
-                          <p className="text-xs text-muted-foreground">Key: {item.section_key}</p>
+                <div className="space-y-4 max-h-[32rem] overflow-y-auto">
+                  {footerContent.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No footer items available yet.</p>
+                  ) : (
+                    footerContent.map((item: any) => (
+                      <div key={item.id} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="font-semibold">{item.section_title}</p>
+                            <p className="text-xs text-muted-foreground">Key: {item.section_key}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setEditingFooterItem(item)}>
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => handleDeleteFooterItem(item.id)}>
+                              Delete
+                            </Button>
+                          </div>
                         </div>
+                        <p className="text-sm text-muted-foreground mt-3 break-words">{item.content || 'No content provided'}</p>
+                        {item.link_url && (
+                          <p className="text-xs text-muted-foreground mt-2">Link: {item.link_url}</p>
+                        )}
                       </div>
-                      <button
-                        onClick={() => setEditingFooterItem(item)}
-                        className="text-xs text-primary hover:text-primary/80 font-medium"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Edit Footer Item</CardTitle>
-                <CardDescription>Update selected footer content.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {editingFooterItem ? (
-                  <form onSubmit={handleUpdateFooterItem} className="space-y-4">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Add New Footer Item</CardTitle>
+                  <CardDescription>Create a new footer section or contact item.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleAddFooterItem} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="fc-title">Title</Label>
-                      <Input 
-                        id="fc-title"
-                        value={editingFooterItem.section_title}
-                        onChange={(e) => setEditingFooterItem({ ...editingFooterItem, section_title: e.target.value })}
+                      <Label htmlFor="new-foot-key">Section Key</Label>
+                      <Input
+                        id="new-foot-key"
+                        value={newFooterItem.section_key}
+                        onChange={(e) => setNewFooterItem({ ...newFooterItem, section_key: e.target.value })}
+                        placeholder="footer_about"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="fc-content">Content</Label>
-                      <textarea 
-                        id="fc-content"
+                      <Label htmlFor="new-foot-title">Section Title</Label>
+                      <Input
+                        id="new-foot-title"
+                        value={newFooterItem.section_title}
+                        onChange={(e) => setNewFooterItem({ ...newFooterItem, section_title: e.target.value })}
+                        placeholder="About PigEvoST"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-foot-content">Content</Label>
+                      <textarea
+                        id="new-foot-content"
                         className="w-full px-3 py-2 border rounded-md"
-                        value={editingFooterItem.content}
-                        onChange={(e) => setEditingFooterItem({ ...editingFooterItem, content: e.target.value })}
+                        value={newFooterItem.content}
+                        onChange={(e) => setNewFooterItem({ ...newFooterItem, content: e.target.value })}
+                        placeholder="Write the footer text..."
                       />
                     </div>
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={loading} className="flex-1">
-                        {loading ? 'Updating...' : 'Update'}
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => setEditingFooterItem(null)}>
-                        Cancel
-                      </Button>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-foot-link">Link URL</Label>
+                      <Input
+                        id="new-foot-link"
+                        value={newFooterItem.link_url}
+                        onChange={(e) => setNewFooterItem({ ...newFooterItem, link_url: e.target.value })}
+                        placeholder="https://example.com"
+                      />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-foot-order">Display Order</Label>
+                      <Input
+                        id="new-foot-order"
+                        type="number"
+                        value={newFooterItem.display_order}
+                        onChange={(e) => setNewFooterItem({ ...newFooterItem, display_order: Number(e.target.value) })}
+                      />
+                    </div>
+                    <Button type="submit" disabled={loading} className="w-full">
+                      {loading ? 'Saving...' : 'Add Footer Item'}
+                    </Button>
                   </form>
-                ) : (
-                  <p className="text-muted-foreground text-sm">Select a footer item to edit</p>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Edit Footer Item</CardTitle>
+                  <CardDescription>Select an item from the list to edit its values.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {editingFooterItem ? (
+                    <form onSubmit={handleUpdateFooterItem} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="fc-title">Title</Label>
+                        <Input
+                          id="fc-title"
+                          value={editingFooterItem.section_title}
+                          onChange={(e) => setEditingFooterItem({ ...editingFooterItem, section_title: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fc-content">Content</Label>
+                        <textarea
+                          id="fc-content"
+                          className="w-full px-3 py-2 border rounded-md"
+                          value={editingFooterItem.content}
+                          onChange={(e) => setEditingFooterItem({ ...editingFooterItem, content: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fc-link">Link URL</Label>
+                        <Input
+                          id="fc-link"
+                          value={editingFooterItem.link_url || ''}
+                          onChange={(e) => setEditingFooterItem({ ...editingFooterItem, link_url: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fc-order">Display Order</Label>
+                        <Input
+                          id="fc-order"
+                          type="number"
+                          value={editingFooterItem.display_order}
+                          onChange={(e) => setEditingFooterItem({ ...editingFooterItem, display_order: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={loading} className="flex-1">
+                          {loading ? 'Updating...' : 'Save Changes'}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setEditingFooterItem(null)}>
+                          Clear
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">Choose a footer item to edit from the list.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           <Card>
