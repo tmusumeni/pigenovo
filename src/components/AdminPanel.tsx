@@ -26,7 +26,15 @@ import {
   ArrowDownLeft,
   AlertCircle,
   User,
-  ExternalLink
+  ExternalLink,
+  Zap,
+  Share2,
+  CheckSquare,
+  Wallet,
+  PieChart,
+  Users,
+  Settings,
+  Footprints
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
@@ -1353,44 +1361,70 @@ export function AdminPanel() {
       </div>
 
       <Tabs defaultValue="markets" className="space-y-6">
-        <TabsList className="bg-muted/50 p-1 rounded-xl">
-          <TabsTrigger value="markets" className="rounded-lg">Markets & Assets</TabsTrigger>
-          <TabsTrigger value="tasks" className="rounded-lg">Watch & Earn Tasks</TabsTrigger>
-          <TabsTrigger value="ads" className="rounded-lg flex gap-2 items-center">
+        <TabsList className="bg-gradient-to-r from-muted to-muted/50 p-2 rounded-xl border border-border/50 flex flex-wrap gap-2 h-auto justify-start">
+          <TabsTrigger value="markets" className="rounded-lg data-[state=active]:bg-blue-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <TrendingUp className="h-4 w-4" />
+            Markets & Assets
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="rounded-lg data-[state=active]:bg-amber-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <Zap className="h-4 w-4" />
+            Watch & Earn Tasks
+          </TabsTrigger>
+          <TabsTrigger value="ads" className="rounded-lg data-[state=active]:bg-green-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <Share2 className="h-4 w-4" />
             Share & Earn Ads
             {pendingAdShares.length > 0 && (
-              <span className="bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+              <span className="bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
                 {pendingAdShares.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="proofs" className="rounded-lg flex gap-2 items-center">
+          <TabsTrigger value="proofs" className="rounded-lg data-[state=active]:bg-purple-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <CheckSquare className="h-4 w-4" />
             Proof Approvals
             {pendingProofs.length > 0 && (
-              <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+              <span className="bg-purple-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
                 {pendingProofs.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="finance" className="rounded-lg flex gap-2 items-center">
+          <TabsTrigger value="finance" className="rounded-lg data-[state=active]:bg-orange-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <DollarSign className="h-4 w-4" />
             Finance
             {financialRequests.length > 0 && (
-              <span className="bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+              <span className="bg-orange-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
                 {financialRequests.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="trades" className="rounded-lg">All Trades</TabsTrigger>
-          <TabsTrigger value="platform-wallet" className="rounded-lg flex gap-2 items-center">
-            💼 Platform Wallet
+          <TabsTrigger value="trades" className="rounded-lg data-[state=active]:bg-cyan-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <BarChart3 className="h-4 w-4" />
+            All Trades
           </TabsTrigger>
-          <TabsTrigger value="wallets" className="rounded-lg flex gap-2 items-center">
-            💰 Wallet Analytics
+          <TabsTrigger value="platform-wallet" className="rounded-lg data-[state=active]:bg-indigo-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <Wallet className="h-4 w-4" />
+            Platform Wallet
           </TabsTrigger>
-          <TabsTrigger value="users" className="rounded-lg">Users</TabsTrigger>
-          <TabsTrigger value="team" className="rounded-lg">👥 Team Members</TabsTrigger>
-          <TabsTrigger value="footer" className="rounded-lg">🔗 Footer Content</TabsTrigger>
-          <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
+          <TabsTrigger value="wallets" className="rounded-lg data-[state=active]:bg-rose-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <PieChart className="h-4 w-4" />
+            Wallet Analytics
+          </TabsTrigger>
+          <TabsTrigger value="users" className="rounded-lg data-[state=active]:bg-sky-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <User className="h-4 w-4" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="team" className="rounded-lg data-[state=active]:bg-teal-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <Users className="h-4 w-4" />
+            Team Members
+          </TabsTrigger>
+          <TabsTrigger value="footer" className="rounded-lg data-[state=active]:bg-fuchsia-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <Footprints className="h-4 w-4" />
+            Footer Content
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="rounded-lg data-[state=active]:bg-gray-500 data-[state=active]:text-white transition-all flex gap-2 items-center px-4 py-2 text-sm font-medium hover:bg-muted-foreground/10">
+            <Settings className="h-4 w-4" />
+            Settings
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="markets" className="space-y-6">

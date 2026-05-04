@@ -3,6 +3,7 @@ import { Mail, Phone, Globe, Github, Linkedin, Twitter } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 interface FooterContent {
+  id?: string;
   section_key: string;
   section_title: string;
   content: string;
@@ -44,6 +45,26 @@ export function DashboardFooter() {
     return footerContent.find(item => item.section_key === key);
   };
 
+  const getLinkItems = (prefix: string) => {
+    return footerContent
+      .filter(item => item.section_key.startsWith(prefix))
+      .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
+  };
+
+  const quickLinks = getLinkItems('footer_link_');
+  const resourceLinks = getLinkItems('footer_resource_');
+  const extraSections = footerContent.filter(item =>
+    ![
+      'footer_about',
+      'footer_about_title',
+      'footer_contact_email',
+      'footer_contact_phone',
+      'footer_copyright'
+    ].includes(item.section_key) &&
+    !item.section_key.startsWith('footer_link_') &&
+    !item.section_key.startsWith('footer_resource_')
+  );
+
   return (
     <footer className="border-t bg-card/50 py-8 px-8 mt-8">
       <div className="max-w-7xl mx-auto">
@@ -56,7 +77,9 @@ export function DashboardFooter() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
               {/* About Section */}
               <div>
-                <h3 className="font-semibold mb-4 text-foreground">About PigEvoST</h3>
+                <h3 className="font-semibold mb-4 text-foreground">
+                  {getContentByKey('footer_about_title')?.content || 'About PigEvoST'}
+                </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {getContentByKey('footer_about')?.content || 'Empowering traders and investors with advanced tools for financial success and wealth creation.'}
                 </p>
@@ -65,23 +88,37 @@ export function DashboardFooter() {
               {/* Quick Links */}
               <div>
                 <h3 className="font-semibold mb-4 text-foreground">Quick Links</h3>
-                <ul className="space-y-2">
-                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Documentation</a></li>
-                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">API Reference</a></li>
-                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Blog</a></li>
-                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Support</a></li>
-                </ul>
+                {quickLinks.length > 0 ? (
+                  <ul className="space-y-2">
+                    {quickLinks.map(link => (
+                      <li key={link.section_key}>
+                        <a href={link.link_url || '#'} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                          {link.section_title || link.content || link.section_key}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Add footer links in admin.</p>
+                )}
               </div>
 
               {/* Resources */}
               <div>
                 <h3 className="font-semibold mb-4 text-foreground">Resources</h3>
-                <ul className="space-y-2">
-                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a></li>
-                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</a></li>
-                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Security</a></li>
-                  <li><a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Contact Us</a></li>
-                </ul>
+                {resourceLinks.length > 0 ? (
+                  <ul className="space-y-2">
+                    {resourceLinks.map(resource => (
+                      <li key={resource.section_key}>
+                        <a href={resource.link_url || '#'} className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                          {resource.section_title || resource.content || resource.section_key}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Add footer resources in admin.</p>
+                )}
               </div>
 
               {/* Contact & Social */}
@@ -110,6 +147,17 @@ export function DashboardFooter() {
                 </div>
               </div>
             </div>
+
+            {extraSections.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                {extraSections.map(section => (
+                  <div key={section.section_key} className="rounded-xl border p-4 bg-muted/50">
+                    <h3 className="font-semibold mb-3 text-foreground">{section.section_title || section.section_key}</h3>
+                    <p className="text-sm text-muted-foreground">{section.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="border-t pt-8">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">

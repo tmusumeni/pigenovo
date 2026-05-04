@@ -82,12 +82,18 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 -- Insert default footer content
-INSERT INTO footer_content (section_key, section_title, content, display_order)
+INSERT INTO footer_content (section_key, section_title, content, link_url, display_order)
 VALUES
-  ('footer_about', 'About PigEvoST', 'Empowering traders and investors with advanced tools for financial success and wealth creation.', 1),
-  ('footer_contact_email', 'Email', 'support@pigenovo.st', 2),
-  ('footer_contact_phone', 'Phone', '+1 (234) 567-8900', 3),
-  ('footer_copyright', 'Copyright', 'PigEvoST. All rights reserved.', 4)
+  ('footer_about_title', 'About', 'About PigEvoST', NULL, 0),
+  ('footer_about', 'About PigEvoST', 'Empowering traders and investors with advanced tools for financial success and wealth creation.', NULL, 1),
+  ('footer_link_docs', 'Documentation', 'Documentation', 'https://example.com/docs', 2),
+  ('footer_link_api', 'API Reference', 'API Reference', 'https://example.com/api', 3),
+  ('footer_resource_privacy', 'Privacy Policy', 'Privacy Policy', 'https://example.com/privacy', 4),
+  ('footer_resource_terms', 'Terms of Service', 'Terms of Service', 'https://example.com/terms', 5),
+  ('footer_help', 'Help', 'Need assistance? Contact support or browse docs.', 'https://example.com/support', 6),
+  ('footer_contact_email', 'Email', 'support@pigenovo.st', NULL, 7),
+  ('footer_contact_phone', 'Phone', '+1 (234) 567-8900', NULL, 8),
+  ('footer_copyright', 'Copyright', 'PigEvoST. All rights reserved.', NULL, 9)
 ON CONFLICT DO NOTHING;
 
 -- Insert default join team settings
