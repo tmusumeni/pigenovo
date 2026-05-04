@@ -1,0 +1,1 @@
+export const LOGO_URL = 'https://vcyxtkfpwixgeiymrozg.supabase.co/storage/v1/object/public/Profiles/ChatGPT%20Image%20Apr%2028,%202026,%2006_33_24%20PM.png';

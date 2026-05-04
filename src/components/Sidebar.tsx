@@ -7,7 +7,6 @@ import {
   MessageSquare, 
   ShieldCheck, 
   LogOut,
-  Zap,
   AlertCircle,
   FileText,
   BarChart3,
@@ -18,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { useLanguage } from '@/lib/LanguageContext';
 import { supabase } from '../supabaseClient';
+import { LOGO_URL } from '@/lib/constants';
 
 interface SidebarProps {
   activeTab: string;
@@ -66,9 +66,14 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
   return (
     <aside className="w-64 bg-card border-r flex flex-col h-screen sticky top-0">
       <div className="p-6 flex items-center gap-3">
-        <div className="bg-primary text-primary-foreground p-2 rounded-xl">
-          <Zap className="h-6 w-6" />
-        </div>
+        <img 
+          src={LOGO_URL} 
+          alt="PiGenovo" 
+          className="h-8 w-8 object-contain"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
         <span className="font-bold text-xl tracking-tighter">PiGenovo</span>
       </div>
 

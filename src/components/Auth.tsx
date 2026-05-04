@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { LogIn, Mail, Github, Chrome, ShieldCheck, Phone, Smartphone } from 'lucide-react';
 import { motion } from 'motion/react';
+import { LOGO_URL } from '@/lib/constants';
 
 export function Auth() {
   const [loading, setLoading] = useState(false);
@@ -246,6 +247,16 @@ export function Auth() {
         )}
         <Card className="border-2">
           <CardHeader className="space-y-1">
+            <div className="flex justify-center mb-4">
+              <img 
+                src={LOGO_URL} 
+                alt="PiGenovo" 
+                className="h-12 w-12 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
             <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
             <CardDescription className="text-center">
               Choose your preferred sign in method

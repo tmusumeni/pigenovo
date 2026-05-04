@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import { Download, FileDown, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LOGO_URL } from '@/lib/constants';
 
 interface Proforma {
   id: string;
@@ -48,6 +49,7 @@ export function PublicProformaView() {
   const [loading, setLoading] = useState(true);
   const [senderProfile, setSenderProfile] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const logoUrl = LOGO_URL;
 
   useEffect(() => {
     loadProformaByToken();
@@ -104,15 +106,15 @@ export function PublicProformaView() {
 
       if (itemsError) throw itemsError;
 
-      // Fetch sender profile
+      // Fetch sender profile through secure RPC so public shares can display sender metadata
       if (proformaData.user_id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', proformaData.user_id)
-          .maybeSingle();
+        const { data: profileData, error: profileError } = await supabase
+          .rpc('get_proforma_share_sender_profile', { p_share_token: shareToken });
 
-        if (profile) setSenderProfile(profile);
+        if (profileError) throw profileError;
+        if (profileData && Array.isArray(profileData) && profileData.length > 0) {
+          setSenderProfile(profileData[0]);
+        }
       }
 
       setProforma({
@@ -183,10 +185,20 @@ export function PublicProformaView() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center"
+          className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
         >
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Proforma #{proforma.number}</h1>
-          <p className="text-slate-600">Shared publicly for viewing</p>
+          <div className="text-left">
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Proforma #{proforma.number}</h1>
+            <p className="text-slate-600">Shared publicly for viewing</p>
+          </div>
+          <img
+            src={proforma.stamp_url || logoUrl}
+            alt="Logo"
+            className="h-16 w-auto object-contain"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
         </motion.div>
 
         {/* Main Content */}

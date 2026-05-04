@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomerSelector } from '@/components/CustomerSelector';
 import { CustomerModal } from '@/components/CustomerModal';
 import { type Customer } from '@/lib/customerService';
+import { LOGO_URL } from '@/lib/constants';
 
 interface Proforma {
   id: string;
@@ -66,12 +67,14 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [showEdit, setShowEdit] = useState(false);
   const [editTab, setEditTab] = useState<'info' | 'items'>('info'); // Tab state for edit modal
   const [previewProforma, setPreviewProforma] = useState<ProformaWithItems | null>(null);
+  const [previewSenderProfile, setPreviewSenderProfile] = useState<any>(null);
   const [editProforma, setEditProforma] = useState<ProformaWithItems | null>(null);
   const [editLineItems, setEditLineItems] = useState<ProformaItem[]>([]);
   const [exportCharge, setExportCharge] = useState(1000);
   const [showSaveAfterExport, setShowSaveAfterExport] = useState(false);
   const [exportPendingProforma, setExportPendingProforma] = useState<ProformaWithItems | null>(null);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'image'>('pdf');
+  const [exportSenderProfile, setExportSenderProfile] = useState<any>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareProforma, setShareProforma] = useState<ProformaWithItems | null>(null);
   const [lastNotifiedIds, setLastNotifiedIds] = useState<Set<string>>(new Set());
@@ -121,6 +124,24 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (previewProforma) {
+      // Fetch current user's profile as sender
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle()
+            .then(({ data }) => setPreviewSenderProfile(data));
+        }
+      });
+    } else {
+      setPreviewSenderProfile(null);
+    }
+  }, [previewProforma]);
 
   const generateNextProformaNumber = async () => {
     try {
@@ -1077,6 +1098,15 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       // Show save/preview modal after charging
       setExportPendingProforma(proforma);
       setExportFormat(format);
+      
+      // Fetch sender profile for export
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', proforma.user_id)
+        .maybeSingle();
+      
+      setExportSenderProfile(senderProfile);
       setShowSaveAfterExport(true);
       toast.success(`✅ Charge of ${exportCharge} RWF deducted. Choose action below.`);
     } catch (error: any) {
@@ -1086,14 +1116,17 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
+  const defaultLogoUrl = LOGO_URL;
+
   const handleSaveAfterExport = (action: 'preview' | 'download') => {
     if (!exportPendingProforma) return;
     
     if (action === 'preview') {
+      setPreviewSenderProfile(exportSenderProfile);
       setPreviewProforma(exportPendingProforma);
       setShowPreview(true);
     } else {
-      generateProformaDocument(exportPendingProforma, exportFormat);
+      generateProformaDocument(exportPendingProforma, exportFormat, exportSenderProfile);
       toast.success(`✅ Proforma exported as ${exportFormat.toUpperCase()}`);
     }
     
@@ -1101,85 +1134,139 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setExportPendingProforma(null);
   };
 
-  const generateProformaDocument = (proforma: ProformaWithItems, format: 'pdf' | 'image') => {
-    // Generate HTML content
+  const generateProformaDocument = (proforma: ProformaWithItems, format: 'pdf' | 'image', senderProfile?: any) => {
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8" />
+        <title>Proforma ${proforma.number}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-          .title { font-size: 24px; font-weight: bold; }
-          .subtitle { font-size: 14px; color: #666; }
-          .section { margin-bottom: 20px; }
-          .label { font-weight: bold; margin-top: 10px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th { background: #f0f0f0; padding: 8px; text-align: left; border: 1px solid #ddd; }
-          td { padding: 8px; border: 1px solid #ddd; }
-          .total { font-weight: bold; background: #f9f9f9; }
-          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+          body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 20px; color: #111827; background: #f8fafc; }
+          .page { max-width: 900px; margin: 0 auto; background: #ffffff; padding: 28px 32px; border-radius: 20px; box-shadow: 0 20px 60px rgba(15, 23, 42, .08); }
+          .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+          .brand-left { display: flex; align-items: center; gap: 16px; }
+          .brand-logo { max-height: 72px; object-fit: contain; }
+          .brand-info h2 { margin: 0; font-size: 18px; font-weight: 700; color: #111827; }
+          .brand-info p { margin: 2px 0; color: #6b7280; font-size: 14px; }
+          .brand-center { text-align: center; flex: 1; }
+          .title { font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -.03em; }
+          .document-badge { padding: 10px 16px; background: #8b5cf6; color: white; border-radius: 999px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+          .title { font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -.03em; }
+          .meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 28px; }
+          .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; }
+          .box h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; }
+          .box p { margin: 4px 0; line-height: 1.65; }
+          .section-title { font-size: 16px; font-weight: 700; margin: 0 0 18px; }
+          .items-table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+          .items-table th, .items-table td { padding: 14px 16px; border: 1px solid #e5e7eb; }
+          .items-table th { background: #f3f4f6; text-align: left; font-weight: 700; color: #374151; }
+          .items-table tbody tr:nth-child(even) { background: #f9fafb; }
+          .items-table td { vertical-align: middle; }
+          .text-right { text-align: right; }
+          .summary { width: 100%; margin-top: 24px; border-collapse: collapse; }
+          .summary td { padding: 12px 16px; }
+          .summary .label { color: #374151; }
+          .summary .value { text-align: right; font-weight: 700; }
+          .stamp { max-height: 96px; object-fit: contain; border-radius: 12px; margin-top: 10px; }
+          .footer { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 13px; }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="title">PROFORMA INVOICE</div>
-          <div class="subtitle">Reference: ${proforma.number}</div>
-        </div>
-        
-        <div class="section">
-          <div class="label">Client Information:</div>
-          <p>Name: ${proforma.client_name}</p>
-          ${proforma.client_phone ? `<p>Phone: ${proforma.client_phone}</p>` : ''}
-          ${proforma.client_email ? `<p>Email: ${proforma.client_email}</p>` : ''}
-        </div>
-        
-        <div class="section">
-          <div class="label">Details:</div>
-          <p>Date: ${new Date(proforma.proforma_date).toLocaleDateString()}</p>
-          ${proforma.valid_until ? `<p>Valid Until: ${new Date(proforma.valid_until).toLocaleDateString()}</p>` : ''}
-          ${proforma.description ? `<p>Description: ${proforma.description}</p>` : ''}
-        </div>
-        
-        <div class="section">
-          <div class="label">Line Items (Unique):</div>
-          <table>
-            <tr>
-              <th>Description</th>
-              <th>Quantity</th>
-              <th>Unit Price</th>
-              <th>Total Price</th>
-            </tr>
-            ${getUniqueItems(proforma.proforma_items)?.map(item => `
+        <div class="page">
+          <div class="brand-row">
+            <div class="brand-left">
+              <img src="${defaultLogoUrl}" alt="App Logo" class="brand-logo" />
+              <div class="brand-info">
+                <h2>${senderProfile?.company_name || senderProfile?.full_name || 'Your Company'}</h2>
+                ${senderProfile?.full_name ? `<p>${senderProfile.full_name}</p>` : ''}
+                ${senderProfile?.email ? `<p>${senderProfile.email}</p>` : ''}
+                ${senderProfile?.phone_number ? `<p>${senderProfile.phone_number}</p>` : ''}
+                ${senderProfile?.country ? `<p>${senderProfile.country}</p>` : ''}
+              </div>
+            </div>
+            <div class="brand-center">
+              <h1 class="title">Proforma Invoice</h1>
+              <p style="margin: 8px 0 0; color: #6b7280;">Generated by PigEvoST</p>
+            </div>
+            <div class="document-badge">${proforma.status.toUpperCase()}</div>
+          </div>
+
+          <div class="meta-grid">
+            <div class="box">
+              <h3>Reference</h3>
+              <p><strong>${proforma.number}</strong></p>
+              <p><strong>Date:</strong> ${new Date(proforma.proforma_date).toLocaleDateString()}</p>
+              ${proforma.valid_until ? `<p><strong>Valid Until:</strong> ${new Date(proforma.valid_until).toLocaleDateString()}</p>` : ''}
+            </div>
+            <div class="box">
+              <h3>Details</h3>
+              <p><strong>Currency:</strong> ${proforma.currency}</p>
+              ${proforma.description ? `<p><strong>Description:</strong> ${proforma.description}</p>` : ''}
+            </div>
+          </div>
+
+          <div class="meta-grid">
+            <div class="box">
+              <h3>Client</h3>
+              <p><strong>${proforma.client_name}</strong></p>
+              ${proforma.client_email ? `<p>${proforma.client_email}</p>` : ''}
+              ${proforma.client_phone ? `<p>${proforma.client_phone}</p>` : ''}
+            </div>
+          </div>
+
+          <div class="section">
+            <h2 class="section-title">Items</h2>
+            <table class="items-table">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th class="text-right">Quantity</th>
+                  <th class="text-right">Unit Price</th>
+                  <th class="text-right">Total Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${getUniqueItems(proforma.proforma_items)?.map(item => `
+                  <tr>
+                    <td>${item.description}</td>
+                    <td class="text-right">${item.quantity}</td>
+                    <td class="text-right">${item.unit_price.toLocaleString()}</td>
+                    <td class="text-right">${(item.quantity * item.unit_price).toLocaleString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <table class="summary">
               <tr>
-                <td>${item.description}</td>
-                <td align="right">${item.quantity}</td>
-                <td align="right">${item.unit_price.toLocaleString()}</td>
-                <td align="right">${(item.quantity * item.unit_price).toLocaleString()}</td>
+                <td class="label">Subtotal</td>
+                <td class="value">${proforma.amount.toLocaleString()} ${proforma.currency}</td>
               </tr>
-            `).join('')}
-            <tr class="total">
-              <td colspan="3" align="right">SUBTOTAL:</td>
-              <td align="right">${proforma.amount.toLocaleString()} ${proforma.currency}</td>
-            </tr>
-            <tr>
-              <td colspan="3" align="right">Discount ${proforma.discount_rate && proforma.discount_rate > 0 ? `(${proforma.discount_rate}%)` : '(0%)'}:</td>
-              <td align="right" style="color: #FF9800;">-${(proforma.discount_amount || 0).toLocaleString()} ${proforma.currency}</td>
-            </tr>
-            <tr>
-              <td colspan="3" align="right">Tax ${proforma.tax_rate && proforma.tax_rate > 0 ? `(${proforma.tax_rate}%)` : '(0%)'}:</td>
-              <td align="right" style="color: #2196F3;">+${(proforma.tax_amount || 0).toLocaleString()} ${proforma.currency}</td>
-            </tr>
-            <tr class="total" style="background: #E8F5E9; font-size: 14px;">
-              <td colspan="3" align="right">FINAL TOTAL:</td>
-              <td align="right" style="color: #4CAF50; font-weight: bold;">${(proforma.total_amount || proforma.amount).toLocaleString()} ${proforma.currency}</td>
-            </tr>
-          </table>
-        </div>
-        
-        <div class="footer">
-          <p>This is an automatically generated proforma invoice.</p>
-          <p>Generated on: ${new Date().toLocaleString()}</p>
+              <tr>
+                <td class="label">Discount ${proforma.discount_rate && proforma.discount_rate > 0 ? `(${proforma.discount_rate}%)` : ''}</td>
+                <td class="value">-${(proforma.discount_amount || 0).toLocaleString()} ${proforma.currency}</td>
+              </tr>
+              <tr>
+                <td class="label">Tax ${proforma.tax_rate && proforma.tax_rate > 0 ? `(${proforma.tax_rate}%)` : ''}</td>
+                <td class="value">+${(proforma.tax_amount || 0).toLocaleString()} ${proforma.currency}</td>
+              </tr>
+              <tr style="font-size: 16px;">
+                <td class="label">Total</td>
+                <td class="value">${(proforma.total_amount || proforma.amount).toLocaleString()} ${proforma.currency}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="section">
+            <h2 class="section-title">Stamp</h2>
+            <img src="${proforma.stamp_url || defaultLogoUrl}" alt="Stamp or Logo" class="stamp" />
+          </div>
+
+          <div class="footer">
+            <p>Thank you for choosing PigEvoST. Convert this HTML attachment to PDF or image using browser print tools for a clean export.</p>
+            <p>Need support? Reach out at support@pigenovo.st.</p>
+          </div>
         </div>
       </body>
       </html>
@@ -1192,7 +1279,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     link.href = url;
     
     // Generate filename with auto-numbering
-    const baseFilename = `Proforma-${proforma.number}`;
+    const baseFilename = `Proforma-${proforma.number}(1)`;
     link.download = `${baseFilename}.html`;
     link.click();
     
@@ -1980,12 +2067,22 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+                {previewSenderProfile && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">From (Sender)</p>
+                    <p className="font-bold">{previewSenderProfile.full_name || 'N/A'}</p>
+                    {previewSenderProfile.email && <p className="text-sm">{previewSenderProfile.email}</p>}
+                    {previewSenderProfile.company_name && <p className="text-sm">{previewSenderProfile.company_name}</p>}
+                    {previewSenderProfile.phone_number && <p className="text-sm">{previewSenderProfile.phone_number}</p>}
+                  </div>
+                )}
                 <div>
                   <p className="text-xs text-muted-foreground">Client</p>
                   <p className="font-bold">{previewProforma.client_name}</p>
                   {previewProforma.client_phone && <p className="text-sm">{previewProforma.client_phone}</p>}
                   {previewProforma.client_email && <p className="text-sm">{previewProforma.client_email}</p>}
                 </div>
+              </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Proforma #</p>
                   <p className="font-bold font-mono">{previewProforma.number}</p>

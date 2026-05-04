@@ -5,8 +5,8 @@ import { Auth } from '@/components/Auth';
 import { Dashboard } from '@/components/Dashboard';
 import { LanguageProvider } from '@/lib/LanguageContext';
 import { Toaster } from '@/components/ui/sonner';
-import { Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { LOGO_URL } from '@/lib/constants';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -33,11 +33,18 @@ export default function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="bg-primary text-primary-foreground p-3 rounded-xl mb-4"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-4"
         >
-          <Zap className="h-8 w-8" />
+          <img 
+            src={LOGO_URL} 
+            alt="PiGenovo" 
+            className="h-16 w-16 object-contain"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
         </motion.div>
         <p className="text-muted-foreground font-medium animate-pulse">Initializing SaaS Foundation...</p>
       </div>

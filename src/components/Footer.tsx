@@ -1,11 +1,11 @@
 import React from 'react';
 import { Heart, Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Youtube } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
+import { LOGO_URL } from '@/lib/constants';
 
 export function Footer() {
   const { t } = useLanguage();
   const currentYear = new Date().getFullYear();
-  const logoUrl = 'https://vcyxtkfpwixgeiymrozg.supabase.co/storage/v1/object/public/Profiles/ChatGPT%20Image%20Apr%2028,%202026,%2006_33_24%20PM.png';
 
   return (
     <footer className="bg-card border-t mt-auto py-8 md:py-12 w-full">
@@ -16,9 +16,12 @@ export function Footer() {
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-2">
               <img 
-                src={logoUrl} 
+                src={LOGO_URL} 
                 alt="PiGenovo" 
                 className="h-8 w-8 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
               <span className="font-bold text-lg">PiGenovo</span>
             </div>

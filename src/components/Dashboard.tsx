@@ -15,9 +15,7 @@ import { RealtimeFeed } from './RealtimeFeed';
 import { DashboardFooter } from './DashboardFooter';
 import { TeamMembers } from './TeamMembers';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bell, Search, User } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { LOGO_URL } from '@/lib/constants';
 
 export function Dashboard({ user }: { user: any }) {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -101,12 +99,25 @@ export function Dashboard({ user }: { user: any }) {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b bg-card flex items-center justify-between px-8 sticky top-0 z-10">
-          <div className="flex-1 max-w-md relative hidden md:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search markets, tasks, or news..." 
-              className="pl-10 bg-muted/50 border-none focus-visible:ring-1"
-            />
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <img 
+                src={LOGO_URL} 
+                alt="PiGenovo" 
+                className="h-8 w-8 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              <span className="font-bold text-lg text-primary">PiGenovo</span>
+            </div>
+            <div className="flex-1 max-w-md relative hidden md:block">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search markets, tasks, or news..." 
+                className="pl-10 bg-muted/50 border-none focus-visible:ring-1"
+              />
+            </div>
           </div>
           
           <div className="flex items-center gap-4">
