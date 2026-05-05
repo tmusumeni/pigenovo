@@ -1,10 +1,8 @@
--- Drop existing tables if they exist (clean slate)
-DROP TABLE IF EXISTS join_team_settings CASCADE;
-DROP TABLE IF EXISTS footer_content CASCADE;
-DROP TABLE IF EXISTS team_members CASCADE;
-
--- Create team_members table
-CREATE TABLE team_members (
+-- Migration: Team Members and Footer Content
+-- Run this in your Supabase SQL Editor: https://supabase.com/dashboard/project/YOUR_PROJECT/sql
+-- This migration creates tables for team members, footer content, and join team settings
+-- Safe to run multiple times - won't drop existing data
+CREATE TABLE IF NOT EXISTS team_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   role VARCHAR(255) NOT NULL,
@@ -19,8 +17,8 @@ CREATE TABLE team_members (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create footer_content table
-CREATE TABLE footer_content (
+-- Create footer_content table (safe version)
+CREATE TABLE IF NOT EXISTS footer_content (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   section_key VARCHAR(100) NOT NULL UNIQUE,
   section_title VARCHAR(255) NOT NULL,
@@ -32,8 +30,8 @@ CREATE TABLE footer_content (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create join_team_settings table for "Join Our Team" section
-CREATE TABLE join_team_settings (
+-- Create join_team_settings table for "Join Our Team" section (safe version)
+CREATE TABLE IF NOT EXISTS join_team_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title VARCHAR(255) NOT NULL DEFAULT 'Join Our Team',
   description TEXT,
@@ -44,10 +42,18 @@ CREATE TABLE join_team_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable RLS
+-- Enable RLS (safe - won't error if already enabled)
 ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE footer_content ENABLE ROW LEVEL SECURITY;
 ALTER TABLE join_team_settings ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (safe cleanup)
+DROP POLICY IF EXISTS "Allow public read team_members" ON team_members;
+DROP POLICY IF EXISTS "Allow admin manage team_members" ON team_members;
+DROP POLICY IF EXISTS "Allow public read footer_content" ON footer_content;
+DROP POLICY IF EXISTS "Allow admin manage footer_content" ON footer_content;
+DROP POLICY IF EXISTS "Allow public read join_team_settings" ON join_team_settings;
+DROP POLICY IF EXISTS "Allow admin manage join_team_settings" ON join_team_settings;
 
 -- RLS Policies - Allow public read
 CREATE POLICY "Allow public read team_members" ON team_members

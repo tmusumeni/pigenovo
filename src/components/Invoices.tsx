@@ -147,6 +147,7 @@ export function Invoices() {
   };
 
   const generateInvoiceDocument = (invoice: Invoice, items: InvoiceItem[], format: 'pdf' | 'image', senderProfile?: any) => {
+    const qrCodeBase64 = 'data:image/png;base64,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';
     const html = `
       <!DOCTYPE html>
       <html>
@@ -154,145 +155,282 @@ export function Invoices() {
         <meta charset="utf-8" />
         <title>Invoice ${invoice.number}</title>
         <style>
-          body { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 20px; color: #111827; background: #f8fafc; }
-          .page { max-width: 900px; margin: 0 auto; background: #ffffff; padding: 28px 32px; border-radius: 20px; box-shadow: 0 20px 60px rgba(15, 23, 42, .08); }
-          .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-          .brand-left { display: flex; align-items: center; gap: 16px; }
-          .brand-logo { max-height: 72px; object-fit: contain; }
-          .brand-info h2 { margin: 0; font-size: 18px; font-weight: 700; color: #111827; }
-          .brand-info p { margin: 2px 0; color: #6b7280; font-size: 14px; }
-          .brand-center { text-align: center; flex: 1; }
-          .title { font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -.03em; }
-          .document-badge { padding: 10px 16px; background: #4f46e5; color: white; border-radius: 999px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
-          .title { font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -.03em; }
-          .meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 28px; }
-          .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; }
-          .box h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; }
-          .box p { margin: 4px 0; line-height: 1.65; }
-          .section-title { font-size: 16px; font-weight: 700; margin: 0 0 18px; }
-          .items-table { width: 100%; border-collapse: collapse; margin-top: 18px; }
-          .items-table th, .items-table td { padding: 14px 16px; border: 1px solid #e5e7eb; }
-          .items-table th { background: #f3f4f6; text-align: left; font-weight: 700; color: #374151; }
-          .items-table tbody tr:nth-child(even) { background: #f9fafb; }
-          .items-table td { vertical-align: middle; }
-          .text-right { text-align: right; }
-          .summary { width: 100%; margin-top: 24px; border-collapse: collapse; }
-          .summary td { padding: 12px 16px; }
-          .summary .label { color: #374151; }
-          .summary .value { text-align: right; font-weight: 700; }
-          .stamp { max-height: 96px; object-fit: contain; border-radius: 12px; margin-top: 10px; }
-          .footer { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 13px; }
+          * { margin: 0; padding: 0; }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            line-height: 1.6;
+            color: #333;
+          }
+          .document-container {
+            max-width: 800px;
+            margin: 0 auto;
+          }
+          .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            gap: 20px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #333;
+          }
+          .logo-section {
+            flex: 1;
+          }
+          .logo-section img {
+            max-width: 400px;
+            height: auto;
+          }
+          .qr-section {
+            flex-shrink: 0;
+            text-align: center;
+          }
+          .qr-section img {
+            width: 140px;
+            height: 140px;
+            border: 1px solid #ccc;
+            padding: 5px;
+          }
+          .qr-label {
+            font-size: 10px;
+            margin-top: 5px;
+            color: #666;
+          }
+          .stamp-section {
+            flex-shrink: 0;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .stamp-image {
+            max-width: 120px;
+            max-height: 120px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 3px;
+          }
+          .sender-info {
+            flex: 1;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+          }
+          .sender-label {
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 8px;
+          }
+          .sender-field {
+            margin: 3px 0;
+            font-size: 11px;
+            line-height: 1.4;
+          }
+          .sender-field strong {
+            font-weight: 600;
+            color: #1a5490;
+          }
+          .header-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 5px;
+          }
+          .title { 
+            font-size: 28px; 
+            font-weight: bold;
+            color: #1a5490;
+            margin-bottom: 5px;
+          }
+          .subtitle { 
+            font-size: 14px; 
+            color: #666;
+          }
+          .two-column {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+          }
+          .column {
+            flex: 1;
+          }
+          .section-label {
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: #1a5490;
+            border-bottom: 1px solid #1a5490;
+            padding-bottom: 5px;
+          }
+          .section-content {
+            font-size: 12px;
+            line-height: 1.8;
+          }
+          .section-content p {
+            margin: 5px 0;
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 10px;
+            font-size: 12px;
+          }
+          th { 
+            background: #1a5490; 
+            color: white;
+            padding: 10px 8px; 
+            text-align: left; 
+            border: 1px solid #ccc; 
+            font-weight: bold;
+          }
+          td { 
+            padding: 8px; 
+            border: 1px solid #ddd; 
+          }
+          tr:nth-child(even) {
+            background: #f9f9f9;
+          }
+          .total-row {
+            font-weight: bold; 
+            background: #e8f5e9;
+            color: #2e7d32;
+          }
+          .summary-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-left: 4px solid #2e7d32;
+            border-radius: 3px;
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 13px;
+          }
+          .summary-row.final {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2e7d32;
+            border-top: 2px solid #2e7d32;
+            padding-top: 8px;
+          }
+          .footer { 
+            margin-top: 40px; 
+            padding-top: 20px; 
+            border-top: 1px solid #ddd; 
+            font-size: 11px; 
+            color: #666;
+            text-align: center;
+          }
+          .footer-note {
+            margin-top: 10px;
+            font-style: italic;
+          }
         </style>
       </head>
       <body>
-        <div class="page">
-          <div class="brand-row">
-            <div class="brand-left">
-              <img src="${defaultLogoUrl}" alt="App Logo" class="brand-logo" />
-              <div class="brand-info">
-                <h2>${senderProfile?.company_name || senderProfile?.full_name || 'Your Company'}</h2>
-                ${senderProfile?.full_name ? `<p>${senderProfile.full_name}</p>` : ''}
-                ${senderProfile?.email ? `<p>${senderProfile.email}</p>` : ''}
-                ${senderProfile?.phone_number ? `<p>${senderProfile.phone_number}</p>` : ''}
-                ${senderProfile?.country ? `<p>${senderProfile.country}</p>` : ''}
+        <div class="document-container">
+          <div class="top-bar">
+            <div class="logo-section">
+              <img src="${defaultLogoUrl}" alt="App Logo" />
+            </div>
+            <div class="qr-section">
+              <img src="${qrCodeBase64}" alt="QR Code" />
+              <div class="qr-label">Scan to verify</div>
+            </div>
+            <div class="stamp-section">
+              <img src="${invoice.stamp_url || defaultLogoUrl}" alt="Stamp" class="stamp-image" />
+            </div>
+            <div class="sender-info">
+              <div class="sender-label">📤 FROM</div>
+              <div class="sender-field"><strong>Company:</strong> ${senderProfile?.company_name || senderProfile?.full_name || 'Your Company'}</div>
+              ${senderProfile?.full_name ? `<div class="sender-field"><strong>Name:</strong> ${senderProfile.full_name}</div>` : ''}
+              ${senderProfile?.email ? `<div class="sender-field"><strong>Email:</strong> ${senderProfile.email}</div>` : ''}
+              ${senderProfile?.phone_number ? `<div class="sender-field"><strong>Phone:</strong> ${senderProfile.phone_number}</div>` : ''}
+              ${senderProfile?.country ? `<div class="sender-field"><strong>Country:</strong> ${senderProfile.country}</div>` : ''}
+            </div>
+          </div>
+
+          <div class="header-section">
+            <div class="title">INVOICE</div>
+            <div class="subtitle">Invoice Number: ${invoice.number}</div>
+          </div>
+
+          <div class="two-column">
+            <div class="column">
+              <div class="section-label">Bill To</div>
+              <div class="section-content">
+                <p><strong>${invoice.client_name}</strong></p>
+                ${invoice.client_email ? `<p>${invoice.client_email}</p>` : ''}
+                ${invoice.client_phone ? `<p>${invoice.client_phone}</p>` : ''}
               </div>
             </div>
-            <div class="brand-center">
-              <h1 class="title">Invoice</h1>
-              <p style="margin: 8px 0 0; color: #6b7280;">Generated by PigEvoST</p>
-            </div>
-            <div class="document-badge">${invoice.status.toUpperCase()}</div>
-          </div>
-
-          <div class="meta-grid">
-            <div class="box">
-              <h3>Invoice</h3>
-              <p><strong>Number:</strong> ${invoice.number}</p>
-              <p><strong>Date:</strong> ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
-              ${invoice.due_date ? `<p><strong>Due Date:</strong> ${new Date(invoice.due_date).toLocaleDateString()}</p>` : ''}
-              ${invoice.payment_method ? `<p><strong>Payment:</strong> ${invoice.payment_method}</p>` : ''}
-            </div>
-            <div class="box">
-              <h3>Document</h3>
-              <p><strong>Created:</strong> ${new Date().toLocaleString()}</p>
-              <p><strong>Currency:</strong> ${invoice.currency}</p>
-              ${invoice.description ? `<p><strong>Note:</strong> ${invoice.description}</p>` : ''}
+            <div class="column">
+              <div class="section-label">Details</div>
+              <div class="section-content">
+                <p><strong>Invoice Date:</strong> ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
+                ${invoice.due_date ? `<p><strong>Due Date:</strong> ${new Date(invoice.due_date).toLocaleDateString()}</p>` : ''}
+                <p><strong>Status:</strong> ${invoice.status}</p>
+                <p><strong>Currency:</strong> ${invoice.currency}</p>
+                ${invoice.payment_method ? `<p><strong>Payment Method:</strong> ${invoice.payment_method}</p>` : ''}
+              </div>
             </div>
           </div>
 
-          <div class="meta-grid">
-            <div class="box">
-              <h3>Bill To</h3>
-              <p><strong>${invoice.client_name}</strong></p>
-              ${invoice.client_email ? `<p>${invoice.client_email}</p>` : ''}
-              ${invoice.client_phone ? `<p>${invoice.client_phone}</p>` : ''}
-            </div>
-          </div>
-
-          <div class="section">
-            <h2 class="section-title">Items</h2>
-            <table class="items-table">
-              <thead>
+          <table>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(item => `
                 <tr>
-                  <th>Description</th>
-                  <th class="text-right">Quantity</th>
-                  <th class="text-right">Unit Price</th>
-                  <th class="text-right">Total</th>
+                  <td>${item.description}</td>
+                  <td>${item.quantity}</td>
+                  <td>${item.unit_price.toLocaleString()} ${invoice.currency}</td>
+                  <td>${item.amount.toLocaleString()} ${invoice.currency}</td>
                 </tr>
-              </thead>
-              <tbody>
-                ${items.map(item => `
-                  <tr>
-                    <td>${item.description}</td>
-                    <td class="text-right">${item.quantity}</td>
-                    <td class="text-right">${item.unit_price.toLocaleString()}</td>
-                    <td class="text-right">${item.amount.toLocaleString()}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+              `).join('')}
+            </tbody>
+          </table>
 
-            <table class="summary">
-              <tr>
-                <td class="label">Subtotal</td>
-                <td class="value">${invoice.amount.toLocaleString()} ${invoice.currency}</td>
-              </tr>
-              <tr>
-                <td class="label">Discount ${invoice.discount_rate && invoice.discount_rate > 0 ? `(${invoice.discount_rate}%)` : ''}</td>
-                <td class="value">-${(invoice.discount_amount || 0).toLocaleString()} ${invoice.currency}</td>
-              </tr>
-              <tr>
-                <td class="label">Tax ${invoice.tax_rate && invoice.tax_rate > 0 ? `(${invoice.tax_rate}%)` : ''}</td>
-                <td class="value">+${(invoice.tax_amount || 0).toLocaleString()} ${invoice.currency}</td>
-              </tr>
-              <tr style="font-size: 16px;">
-                <td class="label">Total</td>
-                <td class="value">${(invoice.total_amount || invoice.amount).toLocaleString()} ${invoice.currency}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div class="section">
-            <h2 class="section-title">Stamp</h2>
-            <img src="${invoice.stamp_url || defaultLogoUrl}" alt="Stamp or Logo" class="stamp" />
+          <div class="summary-section">
+            <div class="summary-row">
+              <span>Subtotal:</span>
+              <span>${invoice.amount.toLocaleString()} ${invoice.currency}</span>
+            </div>
+            ${invoice.discount_amount && invoice.discount_amount > 0 ? `
+            <div class="summary-row" style="color: #ff5722;">
+              <span>Discount ${invoice.discount_rate ? `(${invoice.discount_rate}%)` : ''}:</span>
+              <span>-${invoice.discount_amount.toLocaleString()} ${invoice.currency}</span>
+            </div>
+            ` : ''}
+            ${invoice.tax_amount && invoice.tax_amount > 0 ? `
+            <div class="summary-row" style="color: #2196f3;">
+              <span>Tax ${invoice.tax_rate ? `(${invoice.tax_rate}%)` : ''}:</span>
+              <span>+${invoice.tax_amount.toLocaleString()} ${invoice.currency}</span>
+            </div>
+            ` : ''}
+            <div class="summary-row final">
+              <span>Total Amount:</span>
+              <span>${(invoice.total_amount || invoice.amount).toLocaleString()} ${invoice.currency}</span>
+            </div>
           </div>
 
           <div class="footer">
-            <p>Thank you for using PigEvoST. This document can be exported as HTML and converted to PDF or image using your browser.</p>
-            <p>For questions, contact support@pigenovo.st.</p>
+            <p>Thank you for your business!</p>
+            <div class="footer-note">
+              This invoice was generated automatically by PigEvoST system.
+              Generated on: ${new Date().toLocaleString()}
+            </div>
           </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Create blob and download
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-          <p>This is an automatically generated invoice.</p>
-          <p>Generated on: ${new Date().toLocaleString()}</p>
         </div>
       </body>
       </html>
@@ -305,7 +443,7 @@ export function Invoices() {
     link.href = url;
     
     // Generate filename
-    const baseFilename = `Invoice-${invoice.number}(1)`;
+    const baseFilename = `Invoice-${invoice.number} (1)`;
     link.download = `${baseFilename}.html`;
     link.click();
     
