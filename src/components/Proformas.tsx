@@ -2174,40 +2174,52 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                     animate={{ opacity: 1 }}
                     className="p-4 border-2 border-blue-200 bg-blue-50 rounded-lg hover:bg-blue-100"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="font-mono font-bold">{proforma.number}</span>
-                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getStatusColor(proforma.status)}`}>
-                            {proforma.status.toUpperCase()}
-                          </span>
-                          {proforma.viewed_by_client && (
-                            <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
-                          )}
-                        </div>
-                        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 mb-2">
-                          <p className="text-xs font-semibold text-blue-900 mb-1">📧 SENDER INFORMATION</p>
-                          <p className="text-sm font-bold text-blue-800">
-                            {proforma.sender_profile?.full_name || proforma.client_name}
+                    <div className="flex items-start justify-between mb-3 gap-4">
+                      <div className="flex gap-3 flex-1">
+                        {/* Sender Avatar */}
+                        {proforma.sender_profile?.avatar_url && (
+                          <div className="flex-shrink-0">
+                            <img 
+                              src={proforma.sender_profile.avatar_url}
+                              alt={proforma.sender_profile.full_name}
+                              className="h-12 w-12 rounded-full object-cover border-2 border-primary"
+                            />
+                          </div>
+                        )}
+                        {/* Sender Info */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="font-mono font-bold">{proforma.number}</span>
+                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getStatusColor(proforma.status)}`}>
+                              {proforma.status.toUpperCase()}
+                            </span>
+                            {proforma.viewed_by_client && (
+                              <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
+                            )}
+                          </div>
+                          <p className="text-sm font-semibold text-primary mb-1">
+                            📤 From: {proforma.sender_profile?.full_name || proforma.client_name}
                           </p>
                           {proforma.sender_profile?.company_name && (
-                            <p className="text-xs text-blue-700">Company: {proforma.sender_profile.company_name}</p>
+                            <p className="text-xs font-medium text-muted-foreground">🏢 {proforma.sender_profile.company_name}</p>
                           )}
-                          {proforma.sender_profile?.email && (
-                            <p className="text-xs text-blue-700">Email: {proforma.sender_profile.email}</p>
-                          )}
-                          {proforma.sender_profile?.phone_number ? (
-                            <p className="text-xs text-blue-700">Phone: {proforma.sender_profile.phone_number}</p>
-                          ) : (
-                            proforma.client_phone && <p className="text-xs text-blue-700">Phone: {proforma.client_phone}</p>
-                          )}
-                          {proforma.sender_profile?.country && (
-                            <p className="text-xs text-blue-700">Country: {proforma.sender_profile.country}</p>
-                          )}
-                          {proforma.sent_date && <p className="text-xs text-blue-600 mt-1">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
+                          <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                            {proforma.sender_profile?.email && (
+                              <p>✉️ {proforma.sender_profile.email}</p>
+                            )}
+                            {proforma.sender_profile?.phone_number ? (
+                              <p>📞 {proforma.sender_profile.phone_number}</p>
+                            ) : (
+                              proforma.client_phone && <p>📞 {proforma.client_phone}</p>
+                            )}
+                            {proforma.sender_profile?.country && (
+                              <p>📍 {proforma.sender_profile.country} {proforma.sender_profile.country_code ? `(${proforma.sender_profile.country_code})` : ''}</p>
+                            )}
+                          </div>
+                          {proforma.sent_date && <p className="text-xs text-muted-foreground mt-1">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
                         </div>
                       </div>
-                      <div className="flex items-end flex-col gap-2">
+                      <div className="flex items-end flex-col gap-2 flex-shrink-0">
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">Amount</p>
                           <p className="text-lg font-bold text-blue-600">
@@ -2342,19 +2354,73 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
             <CardContent className="space-y-6">
               <div className="grid grid-cols-2 gap-4 pb-4 border-b">
                 {previewSenderProfile && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">From (Sender)</p>
-                    <p className="font-bold">{previewSenderProfile.full_name || 'N/A'}</p>
-                    {previewSenderProfile.email && <p className="text-sm">{previewSenderProfile.email}</p>}
-                    {previewSenderProfile.company_name && <p className="text-sm">{previewSenderProfile.company_name}</p>}
-                    {previewSenderProfile.phone_number && <p className="text-sm">{previewSenderProfile.phone_number}</p>}
+                  <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
+                    <p className="text-xs text-primary font-semibold uppercase mb-3">📤 From (Sender)</p>
+                    <div className="space-y-2">
+                      {previewSenderProfile.avatar_url && (
+                        <img 
+                          src={previewSenderProfile.avatar_url} 
+                          alt="Sender Avatar"
+                          className="h-12 w-12 rounded-full object-cover"
+                        />
+                      )}
+                      <p className="font-bold text-lg">{previewSenderProfile.full_name || 'N/A'}</p>
+                      {previewSenderProfile.company_name && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Company</p>
+                          <p className="text-sm font-semibold">{previewSenderProfile.company_name}</p>
+                        </div>
+                      )}
+                      {previewSenderProfile.email && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Email</p>
+                          <p className="text-sm">{previewSenderProfile.email}</p>
+                        </div>
+                      )}
+                      {previewSenderProfile.phone_number && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Phone</p>
+                          <p className="text-sm">{previewSenderProfile.phone_number}</p>
+                        </div>
+                      )}
+                      {previewSenderProfile.country && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Location</p>
+                          <p className="text-sm">{previewSenderProfile.country} {previewSenderProfile.country_code ? `(${previewSenderProfile.country_code})` : ''}</p>
+                        </div>
+                      )}
+                      {previewSenderProfile.tin_number && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">TIN</p>
+                          <p className="text-sm font-mono">{previewSenderProfile.tin_number}</p>
+                        </div>
+                      )}
+                      {previewSenderProfile.bio && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Bio</p>
+                          <p className="text-sm">{previewSenderProfile.bio}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
-                <div>
-                  <p className="text-xs text-muted-foreground">Client</p>
-                  <p className="font-bold">{previewProforma.client_name}</p>
-                  {previewProforma.client_phone && <p className="text-sm">{previewProforma.client_phone}</p>}
-                  {previewProforma.client_email && <p className="text-sm">{previewProforma.client_email}</p>}
+                <div className="bg-blue-500/5 p-4 rounded-lg border border-blue-500/20">
+                  <p className="text-xs text-blue-700 font-semibold uppercase mb-3">👤 Client</p>
+                  <div className="space-y-2">
+                    <p className="font-bold text-lg">{previewProforma.client_name}</p>
+                    {previewProforma.client_phone && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <p className="text-sm">{previewProforma.client_phone}</p>
+                      </div>
+                    )}
+                    {previewProforma.client_email && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="text-sm">{previewProforma.client_email}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
                 <div>
