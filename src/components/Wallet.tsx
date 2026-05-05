@@ -413,10 +413,7 @@ export function Wallet({ user }: { user: any }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main Balance Card */}
-        <Card className="md:col-span-2 bg-primary text-primary-foreground overflow-hidden relative">
-          <div className="absolute right-0 top-0 p-8 opacity-10">
-            <WalletIcon className="h-32 w-32 rotate-12" />
-          </div>
+        <Card className="md:col-span-2 bg-primary text-primary-foreground">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary-foreground/80 font-medium">
               <ShieldCheck className="h-4 w-4" />
