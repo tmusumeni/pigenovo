@@ -149,6 +149,13 @@ export function Invoices() {
 
   const generateInvoiceDocument = async (invoice: Invoice, items: InvoiceItem[], format: 'pdf' | 'image', senderProfile?: any) => {
     try {
+      // Get current authenticated user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast.error('Authentication required to create share link');
+        return;
+      }
+
       // Create share token for public access
       const shareToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       const expiresAt = new Date();
@@ -159,7 +166,7 @@ export function Invoices() {
         .insert({
           invoice_id: invoice.id,
           share_token: shareToken,
-          created_by: invoice.user_id,
+          created_by: user.id,
           expires_at: expiresAt.toISOString(),
           share_type: 'qr'
         });

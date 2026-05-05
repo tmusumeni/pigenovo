@@ -1137,6 +1137,13 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
 
   const generateProformaDocument = async (proforma: ProformaWithItems, format: 'pdf' | 'image', senderProfile?: any) => {
     try {
+      // Get current authenticated user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        toast.error('Authentication required to create share link');
+        return;
+      }
+
       // Create share token for public access
       const shareToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       const expiresAt = new Date();
@@ -1147,7 +1154,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         .insert({
           proforma_id: proforma.id,
           share_token: shareToken,
-          created_by: proforma.user_id,
+          created_by: user.id,
           expires_at: expiresAt.toISOString(),
           share_type: 'qr'
         });
