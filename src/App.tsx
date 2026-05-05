@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
 import { Auth } from '@/components/Auth';
 import { Dashboard } from '@/components/Dashboard';
+import { PublicProformaView } from '@/components/PublicProformaView';
+import { PublicInvoiceView } from '@/components/PublicInvoiceView';
 import { LanguageProvider } from '@/lib/LanguageContext';
 import { Toaster } from '@/components/ui/sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -72,6 +74,32 @@ export default function App() {
                   ) : (
                     <Navigate to="/" replace />
                   )
+                } 
+              />
+              <Route 
+                path="/proforma/:shareToken" 
+                element={
+                  <motion.div
+                    key="public-proforma"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <PublicProformaView />
+                  </motion.div>
+                } 
+              />
+              <Route 
+                path="/invoice/:shareToken" 
+                element={
+                  <motion.div
+                    key="public-invoice"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <PublicInvoiceView />
+                  </motion.div>
                 } 
               />
               <Route 

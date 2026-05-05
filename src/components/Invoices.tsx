@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import { Plus, Download, Printer, Edit2, Trash2, Eye, Send, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { LOGO_URL } from '@/lib/constants';
+import QRCode from 'qrcode';
 
 interface Invoice {
   id: string;
@@ -146,9 +147,42 @@ export function Invoices() {
     }
   };
 
-  const generateInvoiceDocument = (invoice: Invoice, items: InvoiceItem[], format: 'pdf' | 'image', senderProfile?: any) => {
-    const qrCodeBase64 = 'data:image/png;base64,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';
-    const html = `
+  const generateInvoiceDocument = async (invoice: Invoice, items: InvoiceItem[], format: 'pdf' | 'image', senderProfile?: any) => {
+    try {
+      // Create share token for public access
+      const shareToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // Expires in 30 days
+
+      const { error: shareError } = await supabase
+        .from('invoice_shares')
+        .insert({
+          invoice_id: invoice.id,
+          share_token: shareToken,
+          created_by: invoice.user_id,
+          expires_at: expiresAt.toISOString(),
+          share_type: 'qr'
+        });
+
+      if (shareError) {
+        console.error('Error creating share token:', shareError);
+        toast.error('Failed to create share link');
+        return;
+      }
+
+      // Generate QR code
+      const publicUrl = `${window.location.origin}/invoice/${shareToken}`;
+      const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+        width: 140,
+        height: 140,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+
+      const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -339,8 +373,8 @@ export function Invoices() {
               <img src="${defaultLogoUrl}" alt="App Logo" />
             </div>
             <div class="qr-section">
-              <img src="${qrCodeBase64}" alt="QR Code" />
-              <div class="qr-label">Scan to verify</div>
+              <img src="${qrCodeDataUrl}" alt="QR Code" />
+              <div class="qr-label">Scan to view</div>
             </div>
             <div class="stamp-section">
               <img src="${invoice.stamp_url || defaultLogoUrl}" alt="Stamp" class="stamp-image" />
@@ -462,6 +496,10 @@ export function Invoices() {
         }
       }
     });
+    } catch (error: any) {
+      console.error('Error generating invoice document:', error);
+      toast.error('Failed to generate invoice document');
+    }
   };
 
   const handleExportInvoice = async (invoice: Invoice, format: 'pdf' | 'image') => {
@@ -475,7 +513,7 @@ export function Invoices() {
         .eq('id', profileId)
         .maybeSingle() : { data: null };
       
-      generateInvoiceDocument(invoice, items, format, senderProfile);
+      await generateInvoiceDocument(invoice, items, format, senderProfile);
     } catch (error: any) {
       toast.error(error.message);
     }
