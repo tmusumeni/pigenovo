@@ -2,14 +2,14 @@
 -- Purpose: Add setting for charging users when sending proformas and modify send function to deduct charge
 
 -- Add proforma send charge setting
-INSERT INTO public.settings (key, value, description, created_at, updated_at)
+INSERT INTO public.settings (id, value, description, created_at, updated_at)
 VALUES (
   'proforma_send_charge',
   '{"charge": 500}',
   'Charge amount in RWF deducted from sender wallet when sending proformas',
   NOW(),
   NOW()
-) ON CONFLICT (key) DO NOTHING;
+) ON CONFLICT (id) DO NOTHING;
 
 -- Update the send_proforma_to_receiver_v2 function to deduct charge from sender wallet
 CREATE OR REPLACE FUNCTION public.send_proforma_to_receiver_v2(
@@ -28,7 +28,7 @@ BEGIN
   -- Get send charge from settings
   SELECT (value->>'charge')::numeric INTO v_send_charge
   FROM public.settings
-  WHERE key = 'proforma_send_charge'
+  WHERE id = 'proforma_send_charge'
   LIMIT 1;
 
   -- If no setting found, use default
