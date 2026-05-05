@@ -24,7 +24,11 @@ export async function createProformaShare(
       return { success: false, error: 'Not authenticated' };
     }
 
-    // Check user's wallet for email/WhatsApp shares (500 RWF charge)
+    // Get the send/share charge from admin settings
+    const { data: chargeData } = await supabase.from('settings').select('*').eq('id', 'proforma_send_charge').single();
+    const chargeAmount = chargeData?.value?.charge || 0;
+
+    // Check user's wallet for email/WhatsApp shares
     if (shareType !== 'qr') {
       const { data: wallet, error: walletError } = await supabase
         .from('wallets')
@@ -33,8 +37,8 @@ export async function createProformaShare(
         .maybeSingle();
 
       if (walletError) throw walletError;
-      if (!wallet || wallet.balance < 500) {
-        return { success: false, error: 'Insufficient wallet balance. Share by email/WhatsApp requires 500 RWF' };
+      if (!wallet || wallet.balance < chargeAmount) {
+        return { success: false, error: `Insufficient wallet balance. Share by email/WhatsApp requires ${chargeAmount} RWF` };
       }
     }
 
@@ -52,7 +56,7 @@ export async function createProformaShare(
         share_type: shareType,
         recipient_email: recipientEmail || null,
         expires_at: expiresAt.toISOString(),
-        share_cost: shareType === 'qr' ? 0 : 500,
+        share_cost: shareType === 'qr' ? 0 : chargeAmount,
         cost_deducted: false,
       }])
       .select()
@@ -65,7 +69,7 @@ export async function createProformaShare(
       const { error: walletError } = await supabase
         .rpc('deduct_wallet_balance', {
           p_user_id: user.id,
-          p_amount: 500,
+          p_amount: chargeAmount,
           p_description: `Share proforma by ${shareType} - ${recipientEmail || 'unknown'}`
         });
 
@@ -106,7 +110,11 @@ export async function createInvoiceShare(
       return { success: false, error: 'Not authenticated' };
     }
 
-    // Check user's wallet for email/WhatsApp shares (500 RWF charge)
+    // Get the send/share charge from admin settings
+    const { data: chargeData } = await supabase.from('settings').select('*').eq('id', 'proforma_send_charge').single();
+    const chargeAmount = chargeData?.value?.charge || 0;
+
+    // Check user's wallet for email/WhatsApp shares
     if (shareType !== 'qr') {
       const { data: wallet, error: walletError } = await supabase
         .from('wallets')
@@ -115,8 +123,8 @@ export async function createInvoiceShare(
         .maybeSingle();
 
       if (walletError) throw walletError;
-      if (!wallet || wallet.balance < 500) {
-        return { success: false, error: 'Insufficient wallet balance. Share by email/WhatsApp requires 500 RWF' };
+      if (!wallet || wallet.balance < chargeAmount) {
+        return { success: false, error: `Insufficient wallet balance. Share by email/WhatsApp requires ${chargeAmount} RWF` };
       }
     }
 
@@ -134,7 +142,7 @@ export async function createInvoiceShare(
         share_type: shareType,
         recipient_email: recipientEmail || null,
         expires_at: expiresAt.toISOString(),
-        share_cost: shareType === 'qr' ? 0 : 500,
+        share_cost: shareType === 'qr' ? 0 : chargeAmount,
         cost_deducted: false,
       }])
       .select()
@@ -147,7 +155,7 @@ export async function createInvoiceShare(
       const { error: walletError } = await supabase
         .rpc('deduct_wallet_balance', {
           p_user_id: user.id,
-          p_amount: 500,
+          p_amount: chargeAmount,
           p_description: `Share invoice by ${shareType} - ${recipientEmail || 'unknown'}`
         });
 

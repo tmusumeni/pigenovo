@@ -83,6 +83,7 @@ export function AdminPanel() {
   const [usdtRate, setUsdtRate] = useState('1300');
   const [piRate, setPiRate] = useState('45000');
   const [proformaExportCharge, setProformaExportCharge] = useState('1000');
+  const [proformaSendCharge, setProformaSendCharge] = useState('500');
   
   // Feature Visibility Management
   const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({
@@ -261,12 +262,19 @@ export function AdminPanel() {
 
   const fetchProformaCharge = async () => {
     try {
-      const { data } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
-      if (data) {
-        setProformaExportCharge(data.value.charge.toString());
+      // Fetch export charge
+      const { data: exportData } = await supabase.from('settings').select('*').eq('id', 'proforma_export_charge').single();
+      if (exportData) {
+        setProformaExportCharge(exportData.value.charge.toString());
+      }
+
+      // Fetch send charge
+      const { data: sendData } = await supabase.from('settings').select('*').eq('id', 'proforma_send_charge').single();
+      if (sendData) {
+        setProformaSendCharge(sendData.value.charge.toString());
       }
     } catch (error) {
-      // Use default if not set
+      // Use defaults if not set
     }
   };
 
@@ -971,12 +979,22 @@ export function AdminPanel() {
     e.preventDefault();
     try {
       setLoading(true);
-      const { error } = await supabase.from('settings').upsert({
+      
+      // Update export charge
+      const { error: exportError } = await supabase.from('settings').upsert({
         id: 'proforma_export_charge',
         value: { charge: Number(proformaExportCharge) }
       });
-      if (error) throw error;
-      toast.success('Proforma export charge updated');
+      if (exportError) throw exportError;
+
+      // Update send charge
+      const { error: sendError } = await supabase.from('settings').upsert({
+        id: 'proforma_send_charge',
+        value: { charge: Number(proformaSendCharge) }
+      });
+      if (sendError) throw sendError;
+
+      toast.success('Proforma charges updated');
       fetchProformaCharge();
     } catch (error: any) {
       toast.error(error.message);
@@ -3019,9 +3037,21 @@ export function AdminPanel() {
                     />
                     <p className="text-xs text-muted-foreground">Users will pay this amount when exporting proformas to PDF or image</p>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sendCharge">Send/Share Charge (RWF)</Label>
+                    <Input 
+                      id="sendCharge" 
+                      type="number" 
+                      value={proformaSendCharge}
+                      onChange={(e) => setProformaSendCharge(e.target.value)}
+                      required
+                      min="0"
+                    />
+                    <p className="text-xs text-muted-foreground">Users will pay this amount when sending or sharing proformas/invoices</p>
+                  </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     <DollarSign className="h-4 w-4 mr-2" />
-                    {loading ? 'Updating...' : 'Update Charge'}
+                    {loading ? 'Updating...' : 'Update Charges'}
                   </Button>
                 </form>
               </CardContent>

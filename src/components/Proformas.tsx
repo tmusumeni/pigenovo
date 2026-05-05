@@ -14,6 +14,7 @@ import { CustomerModal } from '@/components/CustomerModal';
 import { type Customer } from '@/lib/customerService';
 import { LOGO_URL } from '@/lib/constants';
 import QRCode from 'qrcode';
+import { platformWalletService } from '@/lib/platformWalletService';
 
 interface Proforma {
   id: string;
@@ -586,6 +587,36 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Get the send charge from admin settings
+      const { data: chargeData } = await supabase.from('settings').select('*').eq('id', 'proforma_send_charge').single();
+      const chargeAmount = chargeData?.value?.charge || 0;
+
+      // Check user's wallet balance
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (walletError) throw walletError;
+      if (!wallet || wallet.balance < chargeAmount) {
+        toast.error(`Insufficient wallet balance. Sending proforma requires ${chargeAmount} RWF`);
+        return;
+      }
+
+      // Deduct from user's wallet
+      const { error: deductError } = await supabase
+        .rpc('deduct_wallet_balance', {
+          p_user_id: user.id,
+          p_amount: chargeAmount,
+          p_description: `Send proforma to ${proforma.client_email}`
+        });
+
+      if (deductError) throw deductError;
+
+      // Log charge to platform wallet
+      await platformWalletService.addProformaCharge(proforma.id, user.id, chargeAmount);
 
       // Use RPC function to send proforma to receiver (NEW VERSION)
       const { data, error } = await supabase.rpc('send_proforma_to_receiver_v2', {
