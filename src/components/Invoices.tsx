@@ -179,8 +179,9 @@ export function Invoices() {
             flex: 1;
           }
           .logo-section img {
-            max-width: 400px;
-            height: auto;
+            width: 140px;
+            height: 140px;
+            object-fit: contain;
           }
           .qr-section {
             flex-shrink: 0;
