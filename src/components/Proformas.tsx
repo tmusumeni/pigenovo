@@ -2247,7 +2247,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                     {previewProforma.status.toUpperCase()}
                   </p>
                 </div>
-              </div>
 
               {previewProforma.description && (
                 <div>
