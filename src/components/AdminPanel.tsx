@@ -218,12 +218,22 @@ export function AdminPanel() {
       })
       .subscribe();
 
+    const walletTransactionsChannel = supabase
+      .channel('admin-wallet-transactions-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wallet_transactions' }, () => {
+        fetchIncomeSummary();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(financeChannel);
       supabase.removeChannel(proofChannel);
       supabase.removeChannel(adShareChannel);
       supabase.removeChannel(tradeChannel);
       supabase.removeChannel(profileChannel);
+      supabase.removeChannel(earningsChannel);
+      supabase.removeChannel(platformWalletChannel);
+      supabase.removeChannel(walletTransactionsChannel);
     };
   }, []);
 
@@ -580,19 +590,23 @@ export function AdminPanel() {
   const fetchIncomeSummary = async () => {
     try {
       // Get platform wallet data for trading losses and fees
-      const platformWalletData = await supabase
+      const { data: platformWalletData, error: walletError } = await supabase
         .from('platform_wallet')
-        .select('total_user_losses, total_trading_fees, total_earnings')
+        .select('total_user_losses, total_trading_fees, total_earnings, total_proforma_charges, total_advertising_charges')
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      // Get proforma charges (these are send/share charges, not export charges)
+      if (walletError) {
+        console.error('Error fetching platform wallet:', walletError);
+      }
+
+      // Get proforma charges (send/share charges from platform earnings)
       const { data: proformaCharges } = await supabase
         .from('platform_earnings')
         .select('earnings_type, amount')
         .eq('earnings_type', 'proforma_charge');
 
-      // Calculate send/share charges (platform earnings from proforma operations)
+      // Calculate send/share charges
       let sendShareCharges = 0;
       (proformaCharges || []).forEach((charge: any) => {
         sendShareCharges += Number(charge.amount);
@@ -609,24 +623,43 @@ export function AdminPanel() {
         otherEarningsTotal += Number(earning.amount);
       });
 
-      // Note: Export charges are deducted from user wallets but don't add to platform earnings
-      // They are recorded in wallet_transactions but not platform_earnings
+      // Calculate export charges from wallet_transactions
+      const { data: exportTransactions } = await supabase
+        .from('wallet_transactions')
+        .select('amount')
+        .eq('method', 'export_fee')
+        .eq('type', 'debit')
+        .eq('status', 'approved');
+
+      let exportChargesTotal = 0;
+      (exportTransactions || []).forEach((transaction: any) => {
+        exportChargesTotal += Number(transaction.amount);
+      });
 
       const summary = {
         tradingLosses: Number(platformWalletData?.total_user_losses || 0),
         tradingFees: Number(platformWalletData?.total_trading_fees || 0),
         earnings: otherEarningsTotal,
-        exportCharges: 0, // Export charges don't add to platform earnings
+        exportCharges: exportChargesTotal,
         sendShareCharges: sendShareCharges,
         totalIncome: 0
       };
 
-      // Calculate total
-      summary.totalIncome = summary.tradingLosses + summary.tradingFees + summary.earnings + summary.exportCharges + summary.sendShareCharges;
+      // Calculate total income (excluding export charges as noted)
+      summary.totalIncome = summary.tradingLosses + summary.tradingFees + summary.earnings + summary.sendShareCharges;
 
       setIncomeSummary(summary);
     } catch (error) {
       console.error('Error fetching income summary:', error);
+      // Set default values on error
+      setIncomeSummary({
+        tradingLosses: 0,
+        tradingFees: 0,
+        earnings: 0,
+        exportCharges: 0,
+        sendShareCharges: 0,
+        totalIncome: 0
+      });
     }
   };
 
