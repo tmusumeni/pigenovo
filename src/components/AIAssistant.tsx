@@ -9,7 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquare, Send, Bot, User, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
 interface Message {
   role: 'user' | 'assistant';
@@ -21,6 +22,7 @@ export function AIAssistant({ user }: { user: any }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isConfigured = Boolean(GEMINI_API_KEY);
 
   useEffect(() => {
     fetchMessages();
@@ -58,6 +60,10 @@ export function AIAssistant({ user }: { user: any }) {
     setLoading(true);
 
     try {
+      if (!ai) {
+        throw new Error('Gemini API key is not configured. Please set VITE_GEMINI_API_KEY.');
+      }
+
       // 1. Save user message to DB
       await supabase.from('ai_messages').insert({
         user_id: user.id,
@@ -108,6 +114,11 @@ export function AIAssistant({ user }: { user: any }) {
             </div>
           </div>
         </CardHeader>
+        {!isConfigured && (
+          <div className="p-4 bg-yellow-200 text-yellow-800 text-sm border-b border-yellow-300">
+            AI assistant is disabled because the Gemini API key is not configured. Set <code>VITE_GEMINI_API_KEY</code> in your environment to enable it.
+          </div>
+        )}
         <CardContent className="flex-1 overflow-hidden p-0">
           <ScrollArea className="h-full p-6">
             <div className="space-y-6">
@@ -160,10 +171,10 @@ export function AIAssistant({ user }: { user: any }) {
               placeholder="Ask about business trends or trading advice..." 
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              disabled={loading}
+              disabled={loading || !isConfigured}
               className="flex-1 bg-background"
             />
-            <Button type="submit" disabled={loading || !input.trim()}>
+            <Button type="submit" disabled={loading || !input.trim() || !isConfigured}>
               <Send className="h-4 w-4" />
             </Button>
           </form>

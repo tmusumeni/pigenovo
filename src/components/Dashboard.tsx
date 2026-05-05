@@ -14,6 +14,9 @@ import { LanguageSelector } from './LanguageSelector';
 import { RealtimeFeed } from './RealtimeFeed';
 import { DashboardFooter } from './DashboardFooter';
 import { TeamMembers } from './TeamMembers';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Bell, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LOGO_URL } from '@/lib/constants';
 
