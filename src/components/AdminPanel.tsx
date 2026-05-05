@@ -200,6 +200,24 @@ export function AdminPanel() {
       })
       .subscribe();
 
+    // Real-time updates for income summary
+    const earningsChannel = supabase
+      .channel('admin-earnings-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_earnings' }, () => {
+        fetchIncomeSummary();
+        fetchEarningsSummary();
+        fetchPlatformEarnings();
+      })
+      .subscribe();
+
+    const platformWalletChannel = supabase
+      .channel('admin-platform-wallet-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_wallet' }, () => {
+        fetchPlatformWallet();
+        fetchIncomeSummary();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(financeChannel);
       supabase.removeChannel(proofChannel);
@@ -580,11 +598,11 @@ export function AdminPanel() {
         sendShareCharges += Number(charge.amount);
       });
 
-      // Get other earnings (advertising, etc.)
+      // Get other earnings (advertising, referrals, and any other earnings)
       const { data: otherEarnings } = await supabase
         .from('platform_earnings')
         .select('earnings_type, amount')
-        .in('earnings_type', ['advertising_charge', 'referral_bonus']);
+        .not('earnings_type', 'in', '("proforma_charge","user_loss","trading_fee")');
 
       let otherEarningsTotal = 0;
       (otherEarnings || []).forEach((earning: any) => {
@@ -595,8 +613,8 @@ export function AdminPanel() {
       // They are recorded in wallet_transactions but not platform_earnings
 
       const summary = {
-        tradingLosses: Number(platformWalletData.data?.total_user_losses || 0),
-        tradingFees: Number(platformWalletData.data?.total_trading_fees || 0),
+        tradingLosses: Number(platformWalletData?.total_user_losses || 0),
+        tradingFees: Number(platformWalletData?.total_trading_fees || 0),
         earnings: otherEarningsTotal,
         exportCharges: 0, // Export charges don't add to platform earnings
         sendShareCharges: sendShareCharges,
@@ -2402,11 +2420,24 @@ export function AdminPanel() {
 
           <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
             <CardHeader>
-              <CardTitle className="flex gap-2 items-center text-green-800">
-                <DollarSign className="w-5 h-5" />
-                Total Platform Income Summary
-              </CardTitle>
-              <CardDescription className="text-green-700">Comprehensive breakdown of all income sources</CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="flex gap-2 items-center text-green-800">
+                    <DollarSign className="w-5 h-5" />
+                    Total Platform Income Summary
+                  </CardTitle>
+                  <CardDescription className="text-green-700">Comprehensive breakdown of all income sources</CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={fetchIncomeSummary}
+                  className="border-green-300 text-green-700 hover:bg-green-100"
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
