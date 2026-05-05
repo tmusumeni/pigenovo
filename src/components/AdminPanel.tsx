@@ -95,6 +95,7 @@ export function AdminPanel() {
     'ai_assistant': true,
   });
   const [updatingFeature, setUpdatingFeature] = useState<string | null>(null);
+  const [repairingWallets, setRepairingWallets] = useState(false);
   
   // Task Form
   const [taskTitle, setTaskTitle] = useState('');
@@ -308,6 +309,23 @@ export function AdminPanel() {
       toast.error('Failed to update feature visibility');
     } finally {
       setUpdatingFeature(null);
+    }
+  };
+
+  const handleRepairAllWallets = async () => {
+    try {
+      setRepairingWallets(true);
+      const { data, error } = await supabase.rpc('repair_all_user_wallets');
+      if (error) throw error;
+      const created = data?.created || 0;
+      const fixed = data?.fixed_null_balances || 0;
+      toast.success(`Wallet repair complete: ${created} wallets created, ${fixed} balances normalized.`);
+      fetchUserWalletData();
+    } catch (err) {
+      console.error('Error repairing wallets:', err);
+      toast.error('Failed to repair wallets');
+    } finally {
+      setRepairingWallets(false);
     }
   };
 
@@ -3071,6 +3089,32 @@ export function AdminPanel() {
                       </Button>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-2 border border-orange-300 bg-orange-50">
+              <CardHeader>
+                <CardTitle>Repair All User Wallets</CardTitle>
+                <CardDescription>Recreate missing wallets and normalize null balances across all users.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Run this when some users are missing a wallet row or some wallet balances are invalid. It will not overwrite valid wallet balances.
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">Repair user wallets</p>
+                    <p className="text-xs text-muted-foreground">This is an admin-only maintenance action.</p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={handleRepairAllWallets}
+                    disabled={repairingWallets}
+                    className="w-full sm:w-auto"
+                  >
+                    {repairingWallets ? 'Repairing...' : 'Run Repair'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
