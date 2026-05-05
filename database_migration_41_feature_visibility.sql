@@ -22,18 +22,10 @@ CREATE POLICY "Public can read feature visibility" ON public.feature_visibility
 CREATE POLICY "Only admins can update feature visibility" ON public.feature_visibility
   FOR UPDATE
   USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-      AND is_admin = true
-    )
+    is_admin(auth.uid())
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-      AND is_admin = true
-    )
+    is_admin(auth.uid())
   );
 
 -- Insert default features
@@ -69,13 +61,9 @@ RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-  v_is_admin boolean;
 BEGIN
   -- Check if current user is admin
-  SELECT is_admin INTO v_is_admin FROM public.profiles WHERE id = auth.uid();
-  
-  IF NOT v_is_admin THEN
+  IF NOT is_admin(auth.uid()) THEN
     RAISE EXCEPTION 'Only admins can update feature visibility';
   END IF;
   
