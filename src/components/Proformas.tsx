@@ -2172,90 +2172,82 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                     key={proforma.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="p-4 border-2 border-blue-200 bg-blue-50 rounded-lg hover:bg-blue-100"
+                    className="p-4 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg hover:shadow-md transition-shadow"
                   >
-                    <div className="flex items-start justify-between mb-3 gap-4">
-                      <div className="flex gap-3 flex-1">
-                        {/* Sender Avatar */}
-                        {proforma.sender_profile?.avatar_url && (
-                          <div className="flex-shrink-0">
-                            <img 
-                              src={proforma.sender_profile.avatar_url}
-                              alt={proforma.sender_profile.full_name}
-                              className="h-12 w-12 rounded-full object-cover border-2 border-primary"
-                            />
-                          </div>
+                    {/* Header with Proforma Number and Status */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono font-bold text-lg bg-primary/10 px-3 py-1 rounded">{proforma.number}</span>
+                        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getStatusColor(proforma.status)}`}>
+                          {proforma.status.toUpperCase()}
+                        </span>
+                        {proforma.viewed_by_client && (
+                          <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
                         )}
-                        {/* Sender Info */}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="font-mono font-bold">{proforma.number}</span>
-                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${getStatusColor(proforma.status)}`}>
-                              {proforma.status.toUpperCase()}
-                            </span>
-                            {proforma.viewed_by_client && (
-                              <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
-                            )}
-                          </div>
-                          <p className="text-sm font-semibold text-primary mb-1">
-                            📤 From: {proforma.sender_profile?.full_name || proforma.client_name}
-                          </p>
-                          {proforma.sender_profile?.company_name && (
-                            <p className="text-xs font-medium text-muted-foreground">🏢 {proforma.sender_profile.company_name}</p>
-                          )}
-                          <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                            {proforma.sender_profile?.email && (
-                              <p>✉️ {proforma.sender_profile.email}</p>
-                            )}
-                            {proforma.sender_profile?.phone_number ? (
-                              <p>📞 {proforma.sender_profile.phone_number}</p>
-                            ) : (
-                              proforma.client_phone && <p>📞 {proforma.client_phone}</p>
-                            )}
-                            {proforma.sender_profile?.country && (
-                              <p>📍 {proforma.sender_profile.country} {proforma.sender_profile.country_code ? `(${proforma.sender_profile.country_code})` : ''}</p>
-                            )}
-                          </div>
-                          {proforma.sent_date && <p className="text-xs text-muted-foreground mt-1">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
-                        </div>
                       </div>
-                      <div className="flex items-end flex-col gap-2 flex-shrink-0">
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Amount</p>
-                          <p className="text-lg font-bold text-blue-600">
-                            {(proforma.total_amount || proforma.amount).toLocaleString()} {proforma.currency}
-                          </p>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Total Amount</p>
+                        <p className="text-lg font-bold text-primary">
+                          {(proforma.total_amount || proforma.amount).toLocaleString()} {proforma.currency}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Sender Information Card */}
+                    <div className="bg-white rounded-lg p-3 mb-3 border border-primary/20">
+                      <p className="text-xs font-bold text-primary uppercase mb-2">📤 Sender Information</p>
+                      <div className="flex gap-3">
+                        {proforma.sender_profile?.avatar_url && (
+                          <img 
+                            src={proforma.sender_profile.avatar_url}
+                            alt={proforma.sender_profile.full_name}
+                            className="h-10 w-10 rounded-full object-cover border-2 border-primary flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 text-sm space-y-1">
+                          <p className="font-bold">{proforma.sender_profile?.full_name || 'N/A'}</p>
+                          {proforma.sender_profile?.company_name && (
+                            <p className="text-xs font-semibold text-primary">{proforma.sender_profile.company_name}</p>
+                          )}
+                          <div className="flex gap-2 text-xs text-muted-foreground flex-wrap">
+                            {proforma.sender_profile?.email && <span>✉️ {proforma.sender_profile.email}</span>}
+                            {proforma.sender_profile?.phone_number && <span>📞 {proforma.sender_profile.phone_number}</span>}
+                            {proforma.sender_profile?.country && <span>📍 {proforma.sender_profile.country}</span>}
+                            {proforma.sender_profile?.tin_number && <span>🏷️ TIN: {proforma.sender_profile.tin_number}</span>}
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Description */}
                     {proforma.description && (
-                      <p className="text-sm text-muted-foreground mb-3 italic">{proforma.description}</p>
+                      <p className="text-sm text-muted-foreground mb-3 italic bg-white/50 p-2 rounded">📝 {proforma.description}</p>
                     )}
 
                     {/* Items Summary - UNIQUE ONLY */}
-                    <div className="mb-3 text-sm bg-white p-2 rounded">
-                      <p className="font-semibold mb-1">Items:</p>
+                    <div className="mb-3 text-sm bg-white p-2 rounded border border-blue-200">
+                      <p className="font-semibold mb-1 text-xs">📦 Line Items:</p>
                       {getUniqueItems(proforma.proforma_items).map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-xs">
+                        <div key={idx} className="flex justify-between text-xs text-muted-foreground">
                           <span>{item.description} × {item.quantity}</span>
-                          <span>{(item.quantity * item.unit_price).toLocaleString()}</span>
+                          <span className="font-semibold">{(item.quantity * item.unit_price).toLocaleString()}</span>
                         </div>
                       ))}
                     </div>
 
                     {/* Tax/Discount Info */}
                     {(proforma.tax_rate || proforma.discount_rate) && (
-                      <div className="mb-3 text-xs space-y-1 font-semibold">
+                      <div className="mb-3 text-xs space-y-1 font-semibold bg-white/50 p-2 rounded">
                         {proforma.discount_rate > 0 && (
-                          <div className="text-orange-600">Discount: -{(proforma.discount_amount || 0).toLocaleString()} ({proforma.discount_rate}%)</div>
+                          <div className="text-orange-600">💰 Discount: -{(proforma.discount_amount || 0).toLocaleString()} ({proforma.discount_rate}%)</div>
                         )}
                         {proforma.tax_rate > 0 && (
-                          <div className="text-blue-600">Tax: +{(proforma.tax_amount || 0).toLocaleString()} ({proforma.tax_rate}%)</div>
+                          <div className="text-blue-600">📊 Tax: +{(proforma.tax_amount || 0).toLocaleString()} ({proforma.tax_rate}%)</div>
                         )}
                       </div>
                     )}
+
+                    {proforma.sent_date && <p className="text-xs text-muted-foreground mb-3">📅 Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
 
                     {/* Action Buttons */}
                     <div className="flex gap-2">
