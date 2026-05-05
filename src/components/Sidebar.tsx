@@ -10,7 +10,8 @@ import {
   AlertCircle,
   FileText,
   BarChart3,
-  ClipboardList
+  ClipboardList,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,7 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
 
   const menuItems = [
     { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+    { id: 'profile', label: 'Profile', icon: User },
     { id: 'trading', label: t('nav.trading'), icon: TrendingUp },
     { id: 'watch-earn', label: t('nav.watch_earn'), icon: PlayCircle },
     { id: 'wallet', label: t('nav.wallet'), icon: Wallet },

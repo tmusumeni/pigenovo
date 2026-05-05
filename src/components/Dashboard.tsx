@@ -10,6 +10,7 @@ import { Wallet } from './Wallet';
 import { Proformas } from './Proformas';
 import { Invoices } from './Invoices';
 import { Reports } from './Reports';
+import { Profile } from './Profile';
 import { LanguageSelector } from './LanguageSelector';
 import { RealtimeFeed } from './RealtimeFeed';
 import { DashboardFooter } from './DashboardFooter';
@@ -17,7 +18,7 @@ import { TeamMembers } from './TeamMembers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Bell, Search, LayoutDashboard, TrendingUp, PlayCircle, Wallet, MessageSquare, FileText, BarChart3, ClipboardList, ShieldCheck } from 'lucide-react';
+import { Bell, Search, LayoutDashboard, TrendingUp, PlayCircle, Wallet, MessageSquare, FileText, BarChart3, ClipboardList, ShieldCheck, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LOGO_URL } from '@/lib/constants';
 
@@ -69,6 +70,7 @@ export function Dashboard({ user }: { user: any }) {
 
   const mobileNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'profile', label: 'Profile', icon: User },
     { id: 'trading', label: 'Trading', icon: TrendingUp },
     { id: 'watch-earn', label: 'Watch', icon: PlayCircle },
     { id: 'wallet', label: 'Wallet', icon: Wallet },
@@ -82,6 +84,8 @@ export function Dashboard({ user }: { user: any }) {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardOverview user={user} setActiveTab={setActiveTab} />;
+      case 'profile':
+        return <Profile user={user} />;
       case 'trading':
         return <TradingExchange user={user} />;
       case 'watch-earn':
