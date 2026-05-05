@@ -2185,21 +2185,27 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                             <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
                           )}
                         </div>
-                        <p className="text-sm font-semibold text-blue-700">
-                          From: {proforma.sender_profile?.full_name || proforma.client_name}
-                        </p>
-                        {proforma.sender_profile?.company_name && (
-                          <p className="text-xs text-muted-foreground">{proforma.sender_profile.company_name}</p>
-                        )}
-                        {proforma.sender_profile?.email && (
-                          <p className="text-xs text-muted-foreground">{proforma.sender_profile.email}</p>
-                        )}
-                        {proforma.sender_profile?.phone_number ? (
-                          <p className="text-xs text-muted-foreground">{proforma.sender_profile.phone_number}</p>
-                        ) : (
-                          proforma.client_phone && <p className="text-xs text-muted-foreground">{proforma.client_phone}</p>
-                        )}
-                        {proforma.sent_date && <p className="text-xs text-muted-foreground">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
+                        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 mb-2">
+                          <p className="text-xs font-semibold text-blue-900 mb-1">📧 SENDER INFORMATION</p>
+                          <p className="text-sm font-bold text-blue-800">
+                            {proforma.sender_profile?.full_name || proforma.client_name}
+                          </p>
+                          {proforma.sender_profile?.company_name && (
+                            <p className="text-xs text-blue-700">Company: {proforma.sender_profile.company_name}</p>
+                          )}
+                          {proforma.sender_profile?.email && (
+                            <p className="text-xs text-blue-700">Email: {proforma.sender_profile.email}</p>
+                          )}
+                          {proforma.sender_profile?.phone_number ? (
+                            <p className="text-xs text-blue-700">Phone: {proforma.sender_profile.phone_number}</p>
+                          ) : (
+                            proforma.client_phone && <p className="text-xs text-blue-700">Phone: {proforma.client_phone}</p>
+                          )}
+                          {proforma.sender_profile?.country && (
+                            <p className="text-xs text-blue-700">Country: {proforma.sender_profile.country}</p>
+                          )}
+                          {proforma.sent_date && <p className="text-xs text-blue-600 mt-1">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
+                        </div>
                       </div>
                       <div className="flex items-end flex-col gap-2">
                         <div className="text-right">

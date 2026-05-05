@@ -224,21 +224,6 @@ export function Invoices() {
             height: 140px;
             object-fit: contain;
           }
-          .qr-section {
-            flex-shrink: 0;
-            text-align: center;
-          }
-          .qr-section img {
-            width: 140px;
-            height: 140px;
-            border: 1px solid #ccc;
-            padding: 5px;
-          }
-          .qr-label {
-            font-size: 10px;
-            margin-top: 5px;
-            color: #666;
-          }
           .stamp-section {
             flex-shrink: 0;
             text-align: center;
@@ -378,10 +363,6 @@ export function Invoices() {
           <div class="top-bar">
             <div class="logo-section">
               <img src="${defaultLogoUrl}" alt="App Logo" />
-            </div>
-            <div class="qr-section">
-              <img src="${qrCodeDataUrl}" alt="QR Code" />
-              <div class="qr-label">Scan to view</div>
             </div>
             <div class="stamp-section">
               <img src="${invoice.stamp_url || defaultLogoUrl}" alt="Stamp" class="stamp-image" />
