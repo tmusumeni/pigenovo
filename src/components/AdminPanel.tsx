@@ -118,6 +118,16 @@ export function AdminPanel() {
   const [adDescription, setAdDescription] = useState('');
   const [adUploading, setAdUploading] = useState(false);
   
+  // Income Summary
+  const [incomeSummary, setIncomeSummary] = useState({
+    tradingLosses: 0,
+    tradingFees: 0,
+    earnings: 0,
+    exportCharges: 0,
+    sendShareCharges: 0,
+    totalIncome: 0
+  });
+  
   const [allTrades, setAllTrades] = useState<any[]>([]);
   const [platformWallet, setPlatformWallet] = useState<any>(null);
   const [platformEarnings, setPlatformEarnings] = useState<any[]>([]);
@@ -145,6 +155,7 @@ export function AdminPanel() {
     fetchPlatformWallet();
     fetchPlatformEarnings();
     fetchEarningsSummary();
+    fetchIncomeSummary();
     fetchFeatureVisibility();
 
     // REAL-TIME SUBSCRIPTIONS
@@ -545,6 +556,59 @@ export function AdminPanel() {
       setEarningsSummary(Object.values(summary));
     } catch (error) {
       console.error('Error fetching earnings summary:', error);
+    }
+  };
+
+  const fetchIncomeSummary = async () => {
+    try {
+      // Get platform wallet data for trading losses and fees
+      const platformWalletData = await supabase
+        .from('platform_wallet')
+        .select('total_user_losses, total_trading_fees, total_earnings')
+        .limit(1)
+        .single();
+
+      // Get proforma charges (these are send/share charges, not export charges)
+      const { data: proformaCharges } = await supabase
+        .from('platform_earnings')
+        .select('earnings_type, amount')
+        .eq('earnings_type', 'proforma_charge');
+
+      // Calculate send/share charges (platform earnings from proforma operations)
+      let sendShareCharges = 0;
+      (proformaCharges || []).forEach((charge: any) => {
+        sendShareCharges += Number(charge.amount);
+      });
+
+      // Get other earnings (advertising, etc.)
+      const { data: otherEarnings } = await supabase
+        .from('platform_earnings')
+        .select('earnings_type, amount')
+        .in('earnings_type', ['advertising_charge', 'referral_bonus']);
+
+      let otherEarningsTotal = 0;
+      (otherEarnings || []).forEach((earning: any) => {
+        otherEarningsTotal += Number(earning.amount);
+      });
+
+      // Note: Export charges are deducted from user wallets but don't add to platform earnings
+      // They are recorded in wallet_transactions but not platform_earnings
+
+      const summary = {
+        tradingLosses: Number(platformWalletData.data?.total_user_losses || 0),
+        tradingFees: Number(platformWalletData.data?.total_trading_fees || 0),
+        earnings: otherEarningsTotal,
+        exportCharges: 0, // Export charges don't add to platform earnings
+        sendShareCharges: sendShareCharges,
+        totalIncome: 0
+      };
+
+      // Calculate total
+      summary.totalIncome = summary.tradingLosses + summary.tradingFees + summary.earnings + summary.exportCharges + summary.sendShareCharges;
+
+      setIncomeSummary(summary);
+    } catch (error) {
+      console.error('Error fetching income summary:', error);
     }
   };
 
@@ -2335,6 +2399,80 @@ export function AdminPanel() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+            <CardHeader>
+              <CardTitle className="flex gap-2 items-center text-green-800">
+                <DollarSign className="w-5 h-5" />
+                Total Platform Income Summary
+              </CardTitle>
+              <CardDescription className="text-green-700">Comprehensive breakdown of all income sources</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="text-center p-4 bg-white rounded-lg border border-amber-200">
+                  <div className="text-2xl font-bold text-amber-600">
+                    {incomeSummary.tradingLosses.toLocaleString('en-US', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })} RWF
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Trading Losses</p>
+                </div>
+
+                <div className="text-center p-4 bg-white rounded-lg border border-blue-200">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {incomeSummary.tradingFees.toLocaleString('en-US', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })} RWF
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Trading Fees</p>
+                </div>
+
+                <div className="text-center p-4 bg-white rounded-lg border border-purple-200">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {incomeSummary.earnings.toLocaleString('en-US', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })} RWF
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Other Earnings</p>
+                </div>
+
+                <div className="text-center p-4 bg-white rounded-lg border border-orange-200">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {incomeSummary.exportCharges.toLocaleString('en-US', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })} RWF
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Export Charges*</p>
+                  <p className="text-xs text-orange-500 mt-1">*Not platform earnings</p>
+                </div>
+
+                <div className="text-center p-4 bg-white rounded-lg border border-red-200">
+                  <div className="text-2xl font-bold text-red-600">
+                    {incomeSummary.sendShareCharges.toLocaleString('en-US', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })} RWF
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Send/Share Charges</p>
+                </div>
+
+                <div className="text-center p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-lg border-2 border-green-300">
+                  <div className="text-2xl font-bold text-green-800">
+                    {incomeSummary.totalIncome.toLocaleString('en-US', { 
+                      minimumFractionDigits: 2, 
+                      maximumFractionDigits: 2 
+                    })} RWF
+                  </div>
+                  <p className="text-xs font-semibold text-green-700 mt-1">TOTAL INCOME</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
