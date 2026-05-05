@@ -1425,7 +1425,6 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           </div>
         </div>
       </body>
-      </body>
       </html>
     `;
 
