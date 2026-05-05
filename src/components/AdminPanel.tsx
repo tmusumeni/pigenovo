@@ -2612,7 +2612,7 @@ export function AdminPanel() {
                   <div className="space-y-2">
                     <Label htmlFor="tm-avatar">Profile Picture</Label>
                     {teamAvatarPreview && (
-                      <div className="w-full h-32 rounded-lg overflow-hidden bg-muted mb-2">
+                      <div className="w-32 h-32 rounded-lg overflow-hidden bg-muted mb-2">
                         <img src={teamAvatarPreview} alt="Preview" className="w-full h-full object-cover" />
                       </div>
                     )}
