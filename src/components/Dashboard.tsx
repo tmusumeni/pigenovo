@@ -16,7 +16,8 @@ import { DashboardFooter } from './DashboardFooter';
 import { TeamMembers } from './TeamMembers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Bell, Search, LayoutDashboard, TrendingUp, PlayCircle, Wallet, MessageSquare, FileText, BarChart3, ClipboardList, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LOGO_URL } from '@/lib/constants';
 
@@ -66,6 +67,17 @@ export function Dashboard({ user }: { user: any }) {
 
   const isAdmin = profile?.role === 'admin' || user.email === 'tmusumeni@gmail.com';
 
+  const mobileNavItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'trading', label: 'Trading', icon: TrendingUp },
+    { id: 'watch-earn', label: 'Watch', icon: PlayCircle },
+    { id: 'wallet', label: 'Wallet', icon: Wallet },
+    { id: 'proformas', label: 'Proformas', icon: ClipboardList },
+    { id: 'invoices', label: 'Invoices', icon: FileText },
+    { id: 'reports', label: 'Reports', icon: BarChart3 },
+    { id: 'ai-assistant', label: 'AI', icon: MessageSquare },
+  ];
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -101,7 +113,7 @@ export function Dashboard({ user }: { user: any }) {
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b bg-card flex items-center justify-between px-8 sticky top-0 z-10">
+        <header className="h-16 border-b bg-card flex items-center justify-between px-4 md:px-8 sticky top-0 z-10">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <img 
@@ -142,7 +154,27 @@ export function Dashboard({ user }: { user: any }) {
           </div>
         </header>
 
-        <main className="flex-1 p-8 overflow-y-auto">
+        <div className="hidden md:flex lg:hidden border-b bg-card sticky top-16 z-10">
+          <div className="flex items-center gap-2 overflow-x-auto px-4 py-2">
+            {mobileNavItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all',
+                  activeTab === item.id
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-28 md:pb-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -155,6 +187,26 @@ export function Dashboard({ user }: { user: any }) {
             </motion.div>
           </AnimatePresence>
         </main>
+
+        <div className="md:hidden fixed inset-x-0 bottom-0 z-20 border-t bg-card/95 backdrop-blur-md">
+          <div className="flex items-center justify-between px-2 py-2">
+            {mobileNavItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  'flex-1 flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[10px] transition-all',
+                  activeTab === item.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                <span className="text-[10px]">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <TeamMembers />
         <DashboardFooter />

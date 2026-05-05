@@ -64,7 +64,7 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
   ];
 
   return (
-    <aside className="w-64 bg-card border-r flex flex-col h-screen sticky top-0">
+    <aside className="hidden lg:flex w-64 bg-card border-r flex-col h-screen sticky top-0">
       <div className="p-6 flex items-center gap-3">
         <img 
           src={LOGO_URL} 

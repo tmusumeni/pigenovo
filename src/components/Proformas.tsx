@@ -34,6 +34,11 @@ interface Proforma {
   total_amount?: number;
   user_id: string;
   client_user_id?: string;
+  sender_profile?: any;
+  sender_name?: string;
+  sender_company?: string;
+  sender_email?: string;
+  sender_phone?: string;
   sent_date?: string;
   viewed_date?: string;
   recipient_status?: string;
@@ -269,9 +274,43 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           viewed_date: proforma.viewed_date,
           recipient_status: proforma.recipient_status,
           created_at: proforma.created_at,
-          proforma_items: [] // Will load separately if needed
+          proforma_items: [],
+          sender_profile: null,
+          sender_name: undefined,
+          sender_company: undefined,
+          sender_email: undefined,
+          sender_phone: undefined
         };
       });
+
+      // Load sender profiles for received proformas so the receiver can see who sent them
+      const senderIds = Array.from(
+        new Set(processedData.map((p) => p.user_id).filter(Boolean) as string[])
+      );
+
+      if (senderIds.length > 0) {
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, company_name, email, phone_number')
+          .in('id', senderIds);
+
+        if (profileError) throw profileError;
+
+        const senderMap = (profiles || []).reduce<Record<string, any>>((acc, profile) => {
+          if (profile.id) acc[profile.id] = profile;
+          return acc;
+        }, {});
+
+        processedData.forEach((proforma) => {
+          if (proforma.user_id && senderMap[proforma.user_id]) {
+            proforma.sender_profile = senderMap[proforma.user_id];
+            proforma.sender_name = senderMap[proforma.user_id].full_name;
+            proforma.sender_company = senderMap[proforma.user_id].company_name;
+            proforma.sender_email = senderMap[proforma.user_id].email;
+            proforma.sender_phone = senderMap[proforma.user_id].phone_number;
+          }
+        });
+      }
       
       console.log('Processed data:', processedData);
       
@@ -285,7 +324,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         if (firstNew) {
           // Show in-app notification
           toast.success(
-            `🎉 New Proforma Received!\nFrom: ${firstNew.client_name}\nProforma #${firstNew.number}`,
+            `🎉 New Proforma Received!\nFrom: ${firstNew.sender_profile?.full_name || firstNew.client_name}\nProforma #${firstNew.number}`,
             { duration: 5 }
           );
           
@@ -324,7 +363,21 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     // Load items for this proforma
     const items = await loadProformaItems(proforma.id);
     
-    // Set proforma with loaded items
+    // Load sender profile if not already attached
+    let senderProfile = proforma.sender_profile;
+    if (!senderProfile && proforma.user_id) {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, company_name, email, phone_number')
+        .eq('id', proforma.user_id)
+        .maybeSingle();
+
+      if (!profileError && profileData) {
+        senderProfile = profileData;
+      }
+    }
+
+    setPreviewSenderProfile(senderProfile || null);
     setPreviewProforma({
       ...proforma,
       proforma_items: items
@@ -2132,8 +2185,20 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                             <span className="text-xs px-2 py-1 rounded bg-gray-200">👁️ Viewed</span>
                           )}
                         </div>
-                        <p className="text-sm font-semibold text-blue-700">From: {proforma.client_name}</p>
-                        {proforma.client_phone && <p className="text-xs text-muted-foreground">{proforma.client_phone}</p>}
+                        <p className="text-sm font-semibold text-blue-700">
+                          From: {proforma.sender_profile?.full_name || proforma.client_name}
+                        </p>
+                        {proforma.sender_profile?.company_name && (
+                          <p className="text-xs text-muted-foreground">{proforma.sender_profile.company_name}</p>
+                        )}
+                        {proforma.sender_profile?.email && (
+                          <p className="text-xs text-muted-foreground">{proforma.sender_profile.email}</p>
+                        )}
+                        {proforma.sender_profile?.phone_number ? (
+                          <p className="text-xs text-muted-foreground">{proforma.sender_profile.phone_number}</p>
+                        ) : (
+                          proforma.client_phone && <p className="text-xs text-muted-foreground">{proforma.client_phone}</p>
+                        )}
                         {proforma.sent_date && <p className="text-xs text-muted-foreground">Sent: {new Date(proforma.sent_date).toLocaleDateString()}</p>}
                       </div>
                       <div className="flex items-end flex-col gap-2">
