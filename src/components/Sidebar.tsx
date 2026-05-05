@@ -29,7 +29,53 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: SidebarProps) {
   const [pendingCount, setPendingCount] = useState(0);
+  const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({});
   const { t } = useLanguage();
+
+  // Map feature IDs to database feature names
+  const featureMap: Record<string, string> = {
+    'trading': 'trading',
+    'watch-earn': 'watch_earn',
+    'wallet': 'wallet',
+    'proformas': 'proformas',
+    'invoices': 'invoices',
+    'reports': 'reports',
+    'ai-assistant': 'ai_assistant',
+  };
+
+  useEffect(() => {
+    // Fetch feature visibility
+    const fetchFeatureVisibility = async () => {
+      try {
+        const { data, error } = await supabase
+          .rpc('get_feature_visibility');
+        
+        if (error) throw error;
+        
+        const visibilityMap: Record<string, boolean> = {};
+        if (data) {
+          data.forEach((item: any) => {
+            visibilityMap[item.feature_name] = item.is_visible;
+          });
+        }
+        setFeatureVisibility(visibilityMap);
+      } catch (err) {
+        console.error('Error fetching feature visibility:', err);
+        // Default to all visible if fetch fails
+        setFeatureVisibility({
+          'trading': true,
+          'watch_earn': true,
+          'wallet': true,
+          'proformas': true,
+          'invoices': true,
+          'reports': true,
+          'ai_assistant': true,
+        });
+      }
+    };
+
+    fetchFeatureVisibility();
+  }, []);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -53,17 +99,24 @@ export function Sidebar({ activeTab, setActiveTab, isAdmin, onSignOut }: Sidebar
     return () => clearInterval(interval);
   }, [isAdmin]);
 
-  const menuItems = [
-    { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'trading', label: t('nav.trading'), icon: TrendingUp },
-    { id: 'watch-earn', label: t('nav.watch_earn'), icon: PlayCircle },
-    { id: 'wallet', label: t('nav.wallet'), icon: Wallet },
-    { id: 'proformas', label: t('proforma.title'), icon: ClipboardList },
-    { id: 'invoices', label: t('invoices.title'), icon: FileText },
-    { id: 'reports', label: t('reports.title'), icon: BarChart3 },
-    { id: 'ai-assistant', label: 'AI Assistant', icon: MessageSquare },
+  const allMenuItems = [
+    { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard, feature: null },
+    { id: 'profile', label: 'Profile', icon: User, feature: null },
+    { id: 'trading', label: t('nav.trading'), icon: TrendingUp, feature: 'trading' },
+    { id: 'watch-earn', label: t('nav.watch_earn'), icon: PlayCircle, feature: 'watch-earn' },
+    { id: 'wallet', label: t('nav.wallet'), icon: Wallet, feature: 'wallet' },
+    { id: 'proformas', label: t('proforma.title'), icon: ClipboardList, feature: 'proformas' },
+    { id: 'invoices', label: t('invoices.title'), icon: FileText, feature: 'invoices' },
+    { id: 'reports', label: t('reports.title'), icon: BarChart3, feature: 'reports' },
+    { id: 'ai-assistant', label: 'AI Assistant', icon: MessageSquare, feature: 'ai-assistant' },
   ];
+
+  // Filter menu items based on feature visibility
+  const menuItems = allMenuItems.filter(item => {
+    if (!item.feature) return true; // Always show items without features (dashboard, profile)
+    const featureName = featureMap[item.feature];
+    return featureVisibility[featureName] !== false; // Show if not explicitly hidden
+  });
 
   return (
     <aside className="hidden lg:flex w-64 bg-card border-r flex-col h-screen sticky top-0">

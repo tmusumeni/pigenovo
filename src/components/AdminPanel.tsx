@@ -34,7 +34,11 @@ import {
   PieChart,
   Users,
   Settings,
-  Footprints
+  Footprints,
+  PlayCircle,
+  ClipboardList,
+  FileText,
+  MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
@@ -79,6 +83,18 @@ export function AdminPanel() {
   const [usdtRate, setUsdtRate] = useState('1300');
   const [piRate, setPiRate] = useState('45000');
   const [proformaExportCharge, setProformaExportCharge] = useState('1000');
+  
+  // Feature Visibility Management
+  const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({
+    'trading': true,
+    'watch_earn': true,
+    'wallet': true,
+    'proformas': true,
+    'invoices': true,
+    'reports': true,
+    'ai_assistant': true,
+  });
+  const [updatingFeature, setUpdatingFeature] = useState<string | null>(null);
   
   // Task Form
   const [taskTitle, setTaskTitle] = useState('');
@@ -127,6 +143,7 @@ export function AdminPanel() {
     fetchPlatformWallet();
     fetchPlatformEarnings();
     fetchEarningsSummary();
+    fetchFeatureVisibility();
 
     // REAL-TIME SUBSCRIPTIONS
     const financeChannel = supabase
@@ -249,6 +266,48 @@ export function AdminPanel() {
       }
     } catch (error) {
       // Use default if not set
+    }
+  };
+
+  const fetchFeatureVisibility = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_feature_visibility');
+      
+      if (error) throw error;
+      
+      const visibilityMap: Record<string, boolean> = {};
+      if (data) {
+        data.forEach((item: any) => {
+          visibilityMap[item.feature_name] = item.is_visible;
+        });
+      }
+      setFeatureVisibility(visibilityMap);
+    } catch (err) {
+      console.error('Error fetching feature visibility:', err);
+    }
+  };
+
+  const handleToggleFeature = async (featureName: string, currentValue: boolean) => {
+    try {
+      setUpdatingFeature(featureName);
+      const { error } = await supabase.rpc('update_feature_visibility', {
+        p_feature_name: featureName,
+        p_is_visible: !currentValue
+      });
+      
+      if (error) throw error;
+      
+      setFeatureVisibility(prev => ({
+        ...prev,
+        [featureName]: !currentValue
+      }));
+      
+      toast.success(`${featureName.replace(/_/g, ' ')} ${!currentValue ? 'shown' : 'hidden'}`);
+    } catch (err) {
+      console.error('Error updating feature visibility:', err);
+      toast.error('Failed to update feature visibility');
+    } finally {
+      setUpdatingFeature(null);
     }
   };
 
@@ -2612,7 +2671,7 @@ export function AdminPanel() {
                   <div className="space-y-2">
                     <Label htmlFor="tm-avatar">Profile Picture</Label>
                     {teamAvatarPreview && (
-                      <div className="w-32 h-32 rounded-lg overflow-hidden bg-muted mb-2">
+                      <div className="w-full h-32 rounded-lg overflow-hidden bg-muted mb-2">
                         <img src={teamAvatarPreview} alt="Preview" className="w-full h-full object-cover" />
                       </div>
                     )}
@@ -2963,6 +3022,55 @@ export function AdminPanel() {
                 <div className="p-4 bg-background rounded-xl border">
                   <div className="text-xs text-muted-foreground mb-1">PI/RWF</div>
                   <div className="text-xl font-bold font-mono text-primary">1 : {Number(piRate).toLocaleString()}</div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>Feature Visibility</CardTitle>
+                <CardDescription>Show or hide features from the user sidebar menu.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { key: 'trading', label: 'Trading Exchange' },
+                    { key: 'watch_earn', label: 'Watch & Earn' },
+                    { key: 'wallet', label: 'Wallet' },
+                    { key: 'proformas', label: 'Proformas' },
+                    { key: 'invoices', label: 'Invoices' },
+                    { key: 'reports', label: 'Reports' },
+                    { key: 'ai_assistant', label: 'AI Assistant' }
+                  ].map(feature => (
+                    <div key={feature.key} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          {feature.key === 'trading' && <TrendingUp className="h-5 w-5 text-primary" />}
+                          {feature.key === 'watch_earn' && <PlayCircle className="h-5 w-5 text-primary" />}
+                          {feature.key === 'wallet' && <Wallet className="h-5 w-5 text-primary" />}
+                          {feature.key === 'proformas' && <ClipboardList className="h-5 w-5 text-primary" />}
+                          {feature.key === 'invoices' && <FileText className="h-5 w-5 text-primary" />}
+                          {feature.key === 'reports' && <BarChart3 className="h-5 w-5 text-primary" />}
+                          {feature.key === 'ai_assistant' && <MessageSquare className="h-5 w-5 text-primary" />}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{feature.label}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {featureVisibility[feature.key] ? '✓ Visible to users' : '✕ Hidden from users'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant={featureVisibility[feature.key] ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handleToggleFeature(feature.key, featureVisibility[feature.key])}
+                        disabled={updatingFeature === feature.key}
+                        className={featureVisibility[feature.key] ? 'bg-green-600 hover:bg-green-700' : ''}
+                      >
+                        {updatingFeature === feature.key ? 'Updating...' : (featureVisibility[feature.key] ? 'Hide' : 'Show')}
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
