@@ -63,7 +63,8 @@ BEGIN
   INSERT INTO invoices (
     user_id, number, client_name, client_phone, client_email,
     amount, currency, description, status, invoice_date, due_date,
-    tax_rate, discount_rate, tax_amount, discount_amount, total_amount
+    tax_rate, discount_rate, tax_amount, discount_amount, total_amount,
+    stamp_url, stamp_uploaded_at
   ) VALUES (
     p_user_id,
     'INV-' || v_proforma_record.number,
@@ -80,7 +81,9 @@ BEGIN
     COALESCE(v_proforma_record.discount_rate, 0),
     COALESCE(v_proforma_record.tax_amount, 0),
     COALESCE(v_proforma_record.discount_amount, 0),
-    COALESCE(v_proforma_record.total_amount, v_proforma_record.amount)
+    COALESCE(v_proforma_record.total_amount, v_proforma_record.amount),
+    v_proforma_record.stamp_url,
+    v_proforma_record.stamp_uploaded_at
   ) RETURNING id INTO v_invoice_id;
   
   -- Copy proforma items to invoice items

@@ -208,33 +208,31 @@ export function Invoices() {
             margin: 0 auto;
           }
           .top-bar {
-            display: grid;
-            grid-template-columns: 160px 160px minmax(220px, 1fr) 160px;
-            align-items: start;
-            gap: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
             margin-bottom: 30px;
+            gap: 20px;
             padding-bottom: 20px;
             border-bottom: 2px solid #333;
           }
-          .top-bar > div {
-            min-height: 140px;
+          .logo-section {
+            flex: 1;
           }
-          .logo-section,
-          .qr-section,
-          .stamp-section {
-            text-align: center;
-          }
-          .logo-section img,
-          .qr-section img,
-          .stamp-section img {
+          .logo-section img {
             width: 140px;
             height: 140px;
             object-fit: contain;
-            display: block;
-            margin: 0 auto;
+          }
+          .qr-section {
+            flex-shrink: 0;
+            text-align: center;
+          }
+          .qr-section img {
+            width: 140px;
+            height: 140px;
             border: 1px solid #ccc;
             padding: 5px;
-            background: #fff;
           }
           .qr-label {
             font-size: 10px;
@@ -242,29 +240,25 @@ export function Invoices() {
             color: #666;
           }
           .stamp-section {
+            flex-shrink: 0;
+            text-align: center;
             display: flex;
             align-items: center;
             justify-content: center;
           }
-          .stamp-placeholder {
-            width: 140px;
-            height: 140px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px dashed #ddd;
-            color: #777;
-            font-size: 12px;
+          .stamp-image {
+            max-width: 120px;
+            max-height: 120px;
+            border: 1px solid #ddd;
             border-radius: 5px;
-            margin: 0 auto;
-            background: #fff;
+            padding: 3px;
           }
           .sender-info {
+            flex: 1;
             background: #f9f9f9;
             padding: 15px;
             border-radius: 5px;
             font-size: 12px;
-            text-align: left;
           }
           .sender-label {
             font-weight: bold;
@@ -389,16 +383,16 @@ export function Invoices() {
               <img src="${qrCodeDataUrl}" alt="QR Code" />
               <div class="qr-label">Scan to view</div>
             </div>
+            <div class="stamp-section">
+              <img src="${invoice.stamp_url || defaultLogoUrl}" alt="Stamp" class="stamp-image" />
+            </div>
             <div class="sender-info">
-              <div class="sender-label">Sender information</div>
+              <div class="sender-label">📤 FROM</div>
+              <div class="sender-field"><strong>Company:</strong> ${senderProfile?.company_name || senderProfile?.full_name || 'Your Company'}</div>
               ${senderProfile?.full_name ? `<div class="sender-field"><strong>Name:</strong> ${senderProfile.full_name}</div>` : ''}
-              ${senderProfile?.company_name ? `<div class="sender-field"><strong>Company:</strong> ${senderProfile.company_name}</div>` : ''}
               ${senderProfile?.email ? `<div class="sender-field"><strong>Email:</strong> ${senderProfile.email}</div>` : ''}
               ${senderProfile?.phone_number ? `<div class="sender-field"><strong>Phone:</strong> ${senderProfile.phone_number}</div>` : ''}
               ${senderProfile?.country ? `<div class="sender-field"><strong>Country:</strong> ${senderProfile.country}</div>` : ''}
-            </div>
-            <div class="stamp-section">
-              ${invoice.stamp_url ? `<img src="${invoice.stamp_url}" alt="Stamp" class="stamp-image" />` : `<div class="stamp-placeholder">Stamp</div>`}
             </div>
           </div>
 

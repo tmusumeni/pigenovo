@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function Wallet({ user }: { user: any }) {
+  const [walletData, setWalletData] = useState<any>(null);
   const [balance, setBalance] = useState(0);
   const [earnedBalance, setEarnedBalance] = useState(0); // From Watch & Earn + Share & Earn
   const [totalBalance, setTotalBalance] = useState(0); // balance + earned
@@ -80,12 +81,35 @@ export function Wallet({ user }: { user: any }) {
   };
 
   const fetchWallet = async () => {
-    const { data } = await supabase.from('wallets').select('balance').eq('user_id', user.id).single();
-    if (data) {
-      setBalance(data.balance);
-      // Calculate earned balance from transactions
-      fetchEarnedBalance();
+    const { data, error } = await supabase.from('wallets').select('id, balance, currency, updated_at').eq('user_id', user.id).maybeSingle();
+    if (error) {
+      console.error('Error loading wallet:', error);
+      return;
     }
+
+    if (!data) {
+      const { data: newWallet, error: createError } = await supabase.from('wallets').insert({
+        user_id: user.id,
+        balance: 0,
+        currency: 'RWF',
+        updated_at: new Date().toISOString()
+      }).select('id, balance, currency, updated_at').single();
+
+      if (createError) {
+        console.error('Error creating wallet:', createError);
+        return;
+      }
+
+      setWalletData(newWallet);
+      setBalance(0);
+      setTotalBalance(earnedBalance);
+      fetchEarnedBalance();
+      return;
+    }
+
+    setWalletData(data);
+    setBalance(Number(data.balance));
+    fetchEarnedBalance();
   };
 
   const fetchEarnedBalance = async () => {
@@ -365,6 +389,28 @@ export function Wallet({ user }: { user: any }) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Wallet Details</CardTitle>
+          <CardDescription>Full wallet metadata and balance breakdown for your account.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Wallet Owner</div>
+            <p>{profile?.full_name || 'Unknown User'}</p>
+            <p className="text-sm text-muted-foreground">{profile?.email || 'No email available'}</p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Wallet Status</div>
+            <p>{walletData ? 'Active' : 'Not found'}</p>
+            <p className="text-sm text-muted-foreground">Currency: {walletData?.currency || 'RWF'}</p>
+            {walletData?.id && <p className="text-sm text-muted-foreground">Wallet ID: {walletData.id}</p>}
+            {walletData?.updated_at && <p className="text-sm text-muted-foreground">Last updated: {new Date(walletData.updated_at).toLocaleString()}</p>}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main Balance Card */}
         <Card className="md:col-span-2 bg-primary text-primary-foreground overflow-hidden relative">
@@ -379,14 +425,59 @@ export function Wallet({ user }: { user: any }) {
           </CardHeader>
           <CardContent className="pt-2 pb-8">
             <div className="text-5xl font-bold tracking-tighter mb-1">
-              {balance.toLocaleString()} <span className="text-xl font-normal opacity-70">RWF</span>
+              {balance.toLocaleString()} <span className="text-xl font-normal opacity-70">{walletData?.currency || 'RWF'}</span>
             </div>
             <div className="flex gap-4 text-primary-foreground/60 text-sm font-mono">
               <p>{(balance / exchangeRates.usdt_rwf).toFixed(2)} USDT</p>
               <p>•</p>
               <p>{(balance / exchangeRates.pi_rwf).toFixed(4)} PI</p>
             </div>
-            
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 text-sm">
+              <div className="rounded-2xl bg-white/10 p-4">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Wallet Status</p>
+                <p className="mt-2 font-semibold">{walletData ? 'Active' : 'Missing'}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Currency</p>
+                <p className="mt-2 font-semibold">{walletData?.currency || 'RWF'}</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 p-4">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Last Updated</p>
+                <p className="mt-2 font-semibold">{walletData?.updated_at ? new Date(walletData.updated_at).toLocaleString() : 'N/A'}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                  <WalletIcon className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">Wallet Information</p>
+                  <p className="text-xs text-white/70">Complete wallet details for {profile?.full_name || 'your account'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <p className="text-white/70">Wallet ID</p>
+                  <p className="font-mono text-white">{walletData?.id || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-white/70">Owner Email</p>
+                  <p className="font-mono text-white">{profile?.email || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-white/70">Phone</p>
+                  <p className="font-mono text-white">{profile?.phone_number || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-white/70">Country</p>
+                  <p className="font-mono text-white">{profile?.country || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-4 mt-8">
               <Button 
                 className="bg-white text-primary hover:bg-white/90 rounded-xl px-8" 

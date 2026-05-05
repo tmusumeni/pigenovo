@@ -132,21 +132,33 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   }, []);
 
   useEffect(() => {
-    if (previewProforma) {
-      // Fetch current user's profile as sender
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) {
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle()
-            .then(({ data }) => setPreviewSenderProfile(data));
-        }
-      });
-    } else {
+    if (!previewProforma) {
       setPreviewSenderProfile(null);
+      return;
     }
+
+    const loadSenderProfile = async () => {
+      if (previewProforma.sender_profile) {
+        setPreviewSenderProfile(previewProforma.sender_profile);
+        return;
+      }
+
+      const senderId = previewProforma.user_id;
+      if (!senderId) {
+        setPreviewSenderProfile(null);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', senderId)
+        .maybeSingle();
+
+      setPreviewSenderProfile(data || null);
+    };
+
+    loadSenderProfile();
   }, [previewProforma]);
 
   const generateNextProformaNumber = async () => {
@@ -864,6 +876,8 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     setPreviewProforma(proforma);
     setShowPreview(true);
   };
+
+  const senderProfileForPreview = previewSenderProfile || previewProforma?.sender_profile;
 
   const buildShareMessage = (proforma: ProformaWithItems) => {
     const totalAmount = (proforma.total_amount || proforma.amount).toLocaleString();
@@ -2345,52 +2359,52 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-2 gap-4 pb-4 border-b">
-                {previewSenderProfile && (
+                {senderProfileForPreview && (
                   <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
                     <p className="text-xs text-primary font-semibold uppercase mb-3">📤 From (Sender)</p>
                     <div className="space-y-2">
-                      {previewSenderProfile.avatar_url && (
+                      {senderProfileForPreview.avatar_url && (
                         <img 
-                          src={previewSenderProfile.avatar_url} 
+                          src={senderProfileForPreview.avatar_url} 
                           alt="Sender Avatar"
                           className="h-12 w-12 rounded-full object-cover"
                         />
                       )}
-                      <p className="font-bold text-lg">{previewSenderProfile.full_name || 'N/A'}</p>
-                      {previewSenderProfile.company_name && (
+                      <p className="font-bold text-lg">{senderProfileForPreview.full_name || 'N/A'}</p>
+                      {senderProfileForPreview.company_name && (
                         <div>
                           <p className="text-xs text-muted-foreground">Company</p>
-                          <p className="text-sm font-semibold">{previewSenderProfile.company_name}</p>
+                          <p className="text-sm font-semibold">{senderProfileForPreview.company_name}</p>
                         </div>
                       )}
-                      {previewSenderProfile.email && (
+                      {senderProfileForPreview.email && (
                         <div>
                           <p className="text-xs text-muted-foreground">Email</p>
-                          <p className="text-sm">{previewSenderProfile.email}</p>
+                          <p className="text-sm">{senderProfileForPreview.email}</p>
                         </div>
                       )}
-                      {previewSenderProfile.phone_number && (
+                      {senderProfileForPreview.phone_number && (
                         <div>
                           <p className="text-xs text-muted-foreground">Phone</p>
-                          <p className="text-sm">{previewSenderProfile.phone_number}</p>
+                          <p className="text-sm">{senderProfileForPreview.phone_number}</p>
                         </div>
                       )}
-                      {previewSenderProfile.country && (
+                      {senderProfileForPreview.country && (
                         <div>
                           <p className="text-xs text-muted-foreground">Location</p>
-                          <p className="text-sm">{previewSenderProfile.country} {previewSenderProfile.country_code ? `(${previewSenderProfile.country_code})` : ''}</p>
+                          <p className="text-sm">{senderProfileForPreview.country} {senderProfileForPreview.country_code ? `(${senderProfileForPreview.country_code})` : ''}</p>
                         </div>
                       )}
-                      {previewSenderProfile.tin_number && (
+                      {senderProfileForPreview.tin_number && (
                         <div>
                           <p className="text-xs text-muted-foreground">TIN</p>
-                          <p className="text-sm font-mono">{previewSenderProfile.tin_number}</p>
+                          <p className="text-sm font-mono">{senderProfileForPreview.tin_number}</p>
                         </div>
                       )}
-                      {previewSenderProfile.bio && (
+                      {senderProfileForPreview.bio && (
                         <div>
                           <p className="text-xs text-muted-foreground">Bio</p>
-                          <p className="text-sm">{previewSenderProfile.bio}</p>
+                          <p className="text-sm">{senderProfileForPreview.bio}</p>
                         </div>
                       )}
                     </div>
