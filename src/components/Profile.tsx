@@ -19,7 +19,7 @@ interface ProfileData {
   country_code: string;
   bio: string;
   avatar_url: string;
-  tin: string;
+  tin_number: string;
 }
 
 export function Profile({ user }: { user: any }) {
@@ -52,7 +52,7 @@ export function Profile({ user }: { user: any }) {
           country_code: '',
           bio: '',
           avatar_url: '',
-          tin: ''
+          tin_number: ''
         };
 
         const { data: createdProfile, error: createError } = await supabase
@@ -92,7 +92,7 @@ export function Profile({ user }: { user: any }) {
           country: formData.country,
           country_code: formData.country_code,
           bio: formData.bio,
-          tin: formData.tin
+          tin_number: formData.tin_number
         })
         .eq('id', profile.id)
         .select()
@@ -104,7 +104,7 @@ export function Profile({ user }: { user: any }) {
       toast.success('Profile updated successfully!');
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      toast.error(error?.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
@@ -293,8 +293,8 @@ export function Profile({ user }: { user: any }) {
                 <Label htmlFor="tin">Tax Identification Number (TIN)</Label>
                 <Input
                   id="tin"
-                  value={formData.tin || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, tin: e.target.value }))}
+                  value={formData.tin_number || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, tin_number: e.target.value }))}
                   placeholder="Enter your TIN"
                 />
               </div>

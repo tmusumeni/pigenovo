@@ -13,6 +13,10 @@ create table profiles (
   country text,
   country_code text, -- e.g., 'RW' for Rwanda, 'US' for United States
   phone_flag text, -- emoji flag for country
+  company_name text,
+  tin_number text,
+  avatar_url text,
+  bio text,
   role text default 'user' check (role in ('user', 'admin')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -149,6 +153,8 @@ alter table trades enable row level security;
 -- Basic Policies (Owner access + Admin access)
 create policy "Users can view their own profile" on profiles for select using (auth.uid() = id or is_admin(auth.uid()));
 create policy "Admins can update profiles" on profiles for update using (is_admin(auth.uid()));
+
+create policy "Users can update their own profile" on profiles for update using (auth.uid() = id) with check (auth.uid() = id);
 
 create policy "Users can view their own wallet" on wallets for select using (auth.uid() = user_id or is_admin(auth.uid()));
 create policy "Admins can update wallets" on wallets for update using (is_admin(auth.uid()));
