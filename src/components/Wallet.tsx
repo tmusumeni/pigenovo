@@ -472,7 +472,6 @@ export function Wallet({ user }: { user: any }) {
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Last Updated</p>
                 <p className="mt-2 font-semibold">{walletData?.updated_at ? new Date(walletData.updated_at).toLocaleString() : 'N/A'}</p>
               </div>
-            </div>
 
             <div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10">
               <div className="flex items-center gap-3 mb-3">
