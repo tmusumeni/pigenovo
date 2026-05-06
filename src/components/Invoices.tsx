@@ -392,6 +392,7 @@ export function Invoices() {
               ${senderProfile?.full_name ? `<div class="sender-field"><strong>Name:</strong> ${senderProfile.full_name}</div>` : ''}
               ${senderProfile?.email ? `<div class="sender-field"><strong>Email:</strong> ${senderProfile.email}</div>` : ''}
               ${senderProfile?.phone_number ? `<div class="sender-field"><strong>Phone:</strong> ${senderProfile.phone_number}</div>` : ''}
+              ${senderProfile?.tin_number || senderProfile?.tin ? `<div class="sender-field"><strong>TIN:</strong> ${senderProfile.tin_number || senderProfile.tin}</div>` : ''}
               ${senderProfile?.country ? `<div class="sender-field"><strong>Country:</strong> ${senderProfile.country}</div>` : ''}
             </div>
           </div>
@@ -936,6 +937,7 @@ export function Invoices() {
                     {senderProfile.email && <p className="text-sm">{senderProfile.email}</p>}
                     {senderProfile.company_name && <p className="text-sm">{senderProfile.company_name}</p>}
                     {senderProfile.phone_number && <p className="text-sm">{senderProfile.phone_number}</p>}
+                    {(senderProfile.tin_number || senderProfile.tin) && <p className="text-sm">TIN: {senderProfile.tin_number || senderProfile.tin}</p>}
                   </div>
                 )}
                 <div>

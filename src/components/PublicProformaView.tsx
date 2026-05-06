@@ -238,6 +238,12 @@ export function PublicProformaView() {
                         <p className="font-semibold text-sm">{senderProfile.phone_number}</p>
                       </div>
                     )}
+                    {(senderProfile.tin_number || senderProfile.tin) && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">TIN</p>
+                        <p className="font-semibold text-sm">{senderProfile.tin_number || senderProfile.tin}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -1475,7 +1475,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         <p class="sender-field"><strong>Email:</strong> ${senderProfile?.email || 'N/A'}</p>
         <p class="sender-field"><strong>Phone:</strong> ${senderProfile?.phone_number || 'N/A'}</p>
         <p class="sender-field"><strong>Company:</strong> ${senderProfile?.company_name || 'N/A'}</p>
-        <p class="sender-field"><strong>TIN:</strong> ${senderProfile?.tin || 'N/A'}</p>
+        <p class="sender-field"><strong>TIN:</strong> ${senderProfile?.tin_number || senderProfile?.tin || 'N/A'}</p>
       </div>
     
           </div>
