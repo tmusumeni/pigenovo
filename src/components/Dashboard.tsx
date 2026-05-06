@@ -127,6 +127,7 @@ export function Dashboard({ user }: { user: any }) {
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'ai-assistant', label: 'AI', icon: MessageSquare },
+    ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: ShieldCheck }] : []),
   ].filter((item) => {
     const featureName = featureMap[item.id];
     return featureName === null || featureVisibility[featureName] !== false;
