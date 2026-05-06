@@ -35,6 +35,8 @@ export function Wallet({ user }: { user: any }) {
   const [details, setDetails] = useState('');
 
   useEffect(() => {
+    if (!user?.id) return;
+
     fetchWallet();
     fetchProfile();
     fetchTransactions();
@@ -81,6 +83,8 @@ export function Wallet({ user }: { user: any }) {
   };
 
   const fetchWallet = async () => {
+    if (!user?.id) return;
+
     try {
       const { data, error } = await supabase
         .from('wallets')
@@ -93,32 +97,24 @@ export function Wallet({ user }: { user: any }) {
         return;
       }
 
-      if (!data) {
-        const { data: repairResult, error: repairError } = await supabase.rpc('repair_all_user_wallets');
-        if (repairError) {
-          console.error('Error repairing missing wallet:', repairError);
-          return;
-        }
-
-        const { data: repairedWallet, error: repairedError } = await supabase
+      let wallet = data;
+      if (!wallet) {
+        const { data: upsertedWallet, error: upsertError } = await supabase
           .from('wallets')
+          .upsert({ user_id: user.id, balance: 0, currency: 'RWF' }, { onConflict: 'user_id' })
           .select('id, balance, currency, updated_at')
-          .eq('user_id', user.id)
           .single();
 
-        if (repairedError) {
-          console.error('Error fetching repaired wallet:', repairedError);
+        if (upsertError) {
+          console.error('Error creating missing wallet:', upsertError);
           return;
         }
 
-        setWalletData(repairedWallet);
-        setBalance(Number(repairedWallet.balance || 0));
-        fetchEarnedBalance();
-        return;
+        wallet = upsertedWallet;
       }
 
-      setWalletData(data);
-      setBalance(Number(data.balance || 0));
+      setWalletData(wallet);
+      setBalance(Number(wallet.balance || 0));
       fetchEarnedBalance();
     } catch (error) {
       console.error('Error loading wallet:', error);
@@ -178,14 +174,19 @@ export function Wallet({ user }: { user: any }) {
   };
 
   const fetchTransactions = async () => {
-    const { data } = await supabase
-      .from('wallet_transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    setTransactions(data || []);
-    setLoading(false);
-    fetchEarnedBalance(); // Recalculate earned balance
+    try {
+      const { data } = await supabase
+        .from('wallet_transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      setTransactions(data || []);
+      fetchEarnedBalance(); // Recalculate earned balance
+    } catch (err) {
+      console.error('Error fetching wallet transactions:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const calculateConverted = (val: number, type: string) => {
