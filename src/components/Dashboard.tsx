@@ -18,7 +18,7 @@ import { TeamMembers } from './TeamMembers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Bell, Search, LayoutDashboard, TrendingUp, PlayCircle, Wallet, MessageSquare, FileText, BarChart3, ClipboardList, ShieldCheck, User } from 'lucide-react';
+import { Bell, Search, LayoutDashboard, TrendingUp, PlayCircle, Wallet as WalletIcon, MessageSquare, FileText, BarChart3, ClipboardList, ShieldCheck, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LOGO_URL } from '@/lib/constants';
 
@@ -122,7 +122,7 @@ export function Dashboard({ user }: { user: any }) {
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'trading', label: 'Trading', icon: TrendingUp },
     { id: 'watch-earn', label: 'Watch', icon: PlayCircle },
-    { id: 'wallet', label: 'Wallet', icon: Wallet },
+    { id: 'wallet', label: 'Wallet', icon: WalletIcon },
     { id: 'proformas', label: 'Proformas', icon: ClipboardList },
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
