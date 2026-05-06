@@ -25,9 +25,19 @@ import { LOGO_URL } from '@/lib/constants';
 export function Dashboard({ user }: { user: any }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [profile, setProfile] = useState<any>(null);
+  const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({
+    trading: true,
+    watch_earn: true,
+    wallet: true,
+    proformas: true,
+    invoices: true,
+    reports: true,
+    ai_assistant: true,
+  });
 
   useEffect(() => {
     fetchProfile();
+    fetchFeatureVisibility();
   }, []);
 
   const fetchProfile = async () => {
@@ -68,6 +78,45 @@ export function Dashboard({ user }: { user: any }) {
 
   const isAdmin = profile?.role === 'admin' || user.email === 'tmusumeni@gmail.com';
 
+  const fetchFeatureVisibility = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_feature_visibility');
+      if (error) throw error;
+
+      const visibilityMap: Record<string, boolean> = {
+        trading: true,
+        watch_earn: true,
+        wallet: true,
+        proformas: true,
+        invoices: true,
+        reports: true,
+        ai_assistant: true,
+      };
+
+      if (data) {
+        data.forEach((item: any) => {
+          visibilityMap[item.feature_name] = item.is_visible;
+        });
+      }
+
+      setFeatureVisibility(visibilityMap);
+    } catch (err) {
+      console.error('Error fetching feature visibility:', err);
+    }
+  };
+
+  const featureMap: Record<string, string | null> = {
+    dashboard: null,
+    profile: null,
+    trading: 'trading',
+    'watch-earn': 'watch_earn',
+    wallet: 'wallet',
+    proformas: 'proformas',
+    invoices: 'invoices',
+    reports: 'reports',
+    'ai-assistant': 'ai_assistant',
+  };
+
   const mobileNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profile', label: 'Profile', icon: User },
@@ -78,10 +127,15 @@ export function Dashboard({ user }: { user: any }) {
     { id: 'invoices', label: 'Invoices', icon: FileText },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'ai-assistant', label: 'AI', icon: MessageSquare },
-  ];
+  ].filter((item) => {
+    const featureName = featureMap[item.id];
+    return featureName === null || featureVisibility[featureName] !== false;
+  });
 
   const renderContent = () => {
-    switch (activeTab) {
+    const visibleTab = activeTab === 'wallet' && featureVisibility.wallet === false ? 'dashboard' : activeTab;
+
+    switch (visibleTab) {
       case 'dashboard':
         return <DashboardOverview user={user} setActiveTab={setActiveTab} />;
       case 'profile':
