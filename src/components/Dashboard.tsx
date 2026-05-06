@@ -18,7 +18,7 @@ import { TeamMembers } from './TeamMembers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Bell, Search, LayoutDashboard, TrendingUp, PlayCircle, Wallet as WalletIcon, MessageSquare, FileText, BarChart3, ClipboardList, ShieldCheck, User } from 'lucide-react';
+import { Bell, Search, LayoutDashboard, TrendingUp, PlayCircle, Wallet as WalletIcon, MessageSquare, FileText, BarChart3, ClipboardList, ShieldCheck, User, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LOGO_URL } from '@/lib/constants';
 
@@ -208,6 +208,14 @@ export function Dashboard({ user }: { user: any }) {
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/20">
                 {(user.email?.[0] || user.phone?.[0] || 'U').toUpperCase()}
               </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleSignOut}
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </header>
