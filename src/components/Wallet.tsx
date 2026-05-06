@@ -334,6 +334,7 @@ export function Wallet({ user }: { user: any }) {
         
         if (walletError) throw walletError;
         setBalance(newBalance);
+        setTotalBalance(newBalance + earnedBalance);
       }
 
       if (status === 'approved') {
@@ -431,21 +432,35 @@ export function Wallet({ user }: { user: any }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary-foreground/80 font-medium">
               <ShieldCheck className="h-4 w-4" />
-              Current Wallet Balance
+              Total Wallet Balance
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-2 pb-8">
             <div className="text-5xl font-bold tracking-tighter mb-1">
-              {balance.toLocaleString()} <span className="text-xl font-normal opacity-70">{walletData?.currency || 'RWF'}</span>
+              {totalBalance.toLocaleString()} <span className="text-xl font-normal opacity-70">{walletData?.currency || 'RWF'}</span>
             </div>
             <div className="flex gap-4 text-primary-foreground/60 text-sm font-mono">
-              <p>{(balance / exchangeRates.usdt_rwf).toFixed(2)} USDT</p>
+              <p>{(totalBalance / exchangeRates.usdt_rwf).toFixed(2)} USDT</p>
               <p>•</p>
-              <p>{(balance / exchangeRates.pi_rwf).toFixed(4)} PI</p>
+              <p>{(totalBalance / exchangeRates.pi_rwf).toFixed(4)} PI</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 text-sm">
-              <div className="rounded-2xl bg-white/10 p-4">
+            <div className="mt-6 p-4 rounded-3xl bg-white/10 border border-white/20 text-sm font-medium">
+              <p className="text-white/80">Deposit - Withdrawal + Earnings = Total Balance</p>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="rounded-2xl bg-white/10 p-4">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Wallet Balance</p>
+                  <p className="mt-2 font-semibold">{balance.toLocaleString()} RWF</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-4">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Earnings</p>
+                  <p className="mt-2 font-semibold">{earnedBalance.toLocaleString()} RWF</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-4">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Total</p>
+                  <p className="mt-2 font-semibold">{totalBalance.toLocaleString()} RWF</p>
+                </div>
+              </div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Wallet Status</p>
                 <p className="mt-2 font-semibold">{walletData ? 'Active' : 'Missing'}</p>
               </div>
