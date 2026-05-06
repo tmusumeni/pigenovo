@@ -3018,7 +3018,7 @@ export function AdminPanel() {
               <Card>
                 <CardHeader>
                   <CardTitle>Add New Footer Item</CardTitle>
-                  <CardDescription>Create a new footer section or contact item.</CardDescription>
+                  <CardDescription>Create a new footer section or contact item. Use social keys like footer_social_facebook, footer_social_twitter, footer_social_youtube, footer_social_x, footer_social_linkedin.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleAddFooterItem} className="space-y-4">
