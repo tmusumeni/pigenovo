@@ -489,22 +489,30 @@ export function Wallet({ user }: { user: any }) {
               </div>
             </div>
 
-            <div className="flex gap-4 mt-8">
-              <Button 
-                className="bg-white text-primary hover:bg-white/90 rounded-xl px-8" 
-                onClick={() => setAction('deposit')}
-              >
-                <ArrowDownLeft className="h-4 w-4 mr-2" />
-                Deposit
-              </Button>
-              <Button 
-                variant="outline" 
-                className="border-white/20 hover:bg-white/10 text-white rounded-xl px-8"
-                onClick={() => setAction('withdraw')}
-              >
-                <ArrowUpRight className="h-4 w-4 mr-2" />
-                Withdraw
-              </Button>
+            <div className="flex flex-col gap-4 mt-8">
+              <div className="flex gap-4">
+                <Button 
+                  className="bg-white text-primary hover:bg-white/90 rounded-xl px-8" 
+                  onClick={() => setAction('deposit')}
+                >
+                  <ArrowDownLeft className="h-4 w-4 mr-2" />
+                  Deposit
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="border-white/20 hover:bg-white/10 text-white rounded-xl px-8"
+                  onClick={() => setAction('withdraw')}
+                >
+                  <ArrowUpRight className="h-4 w-4 mr-2" />
+                  Withdraw
+                </Button>
+              </div>
+              <div className="rounded-3xl border border-primary/20 bg-primary/5 p-4">
+                <h5 className="text-sm font-semibold text-primary">Deposit via Momo</h5>
+                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                  If you want to deposit or add funds, pay on Momo: <span className="font-mono">*182*8*1*150003#</span>, enter the amount you want to add, then enter your PIN.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
