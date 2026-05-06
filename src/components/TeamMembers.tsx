@@ -92,7 +92,7 @@ export function TeamMembers() {
                   key={member.id}
                   className="group rounded-lg border bg-card/50 p-6 hover:bg-card hover:border-primary/50 transition-all duration-300 hover:shadow-lg"
                 >
-                  <div className="w-full h-32 mb-4 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                  <div className="w-full aspect-square mb-4 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
                     {member.avatar ? (
                       <img 
                         src={member.avatar} 

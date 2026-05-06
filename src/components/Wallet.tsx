@@ -81,35 +81,48 @@ export function Wallet({ user }: { user: any }) {
   };
 
   const fetchWallet = async () => {
-    const { data, error } = await supabase.from('wallets').select('id, balance, currency, updated_at').eq('user_id', user.id).maybeSingle();
-    if (error) {
-      console.error('Error loading wallet:', error);
-      return;
-    }
+    try {
+      const { data, error } = await supabase
+        .from('wallets')
+        .select('id, balance, currency, updated_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    if (!data) {
-      const { data: newWallet, error: createError } = await supabase.from('wallets').insert({
-        user_id: user.id,
-        balance: 0,
-        currency: 'RWF',
-        updated_at: new Date().toISOString()
-      }).select('id, balance, currency, updated_at').single();
-
-      if (createError) {
-        console.error('Error creating wallet:', createError);
+      if (error) {
+        console.error('Error loading wallet:', error);
         return;
       }
 
-      setWalletData(newWallet);
-      setBalance(0);
-      setTotalBalance(earnedBalance);
-      fetchEarnedBalance();
-      return;
-    }
+      if (!data) {
+        const { data: repairResult, error: repairError } = await supabase.rpc('repair_all_user_wallets');
+        if (repairError) {
+          console.error('Error repairing missing wallet:', repairError);
+          return;
+        }
 
-    setWalletData(data);
-    setBalance(Number(data.balance));
-    fetchEarnedBalance();
+        const { data: repairedWallet, error: repairedError } = await supabase
+          .from('wallets')
+          .select('id, balance, currency, updated_at')
+          .eq('user_id', user.id)
+          .single();
+
+        if (repairedError) {
+          console.error('Error fetching repaired wallet:', repairedError);
+          return;
+        }
+
+        setWalletData(repairedWallet);
+        setBalance(Number(repairedWallet.balance || 0));
+        fetchEarnedBalance();
+        return;
+      }
+
+      setWalletData(data);
+      setBalance(Number(data.balance || 0));
+      fetchEarnedBalance();
+    } catch (error) {
+      console.error('Error loading wallet:', error);
+    }
   };
 
   const fetchEarnedBalance = async () => {
