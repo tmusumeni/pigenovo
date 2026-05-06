@@ -1,6 +1,8 @@
 -- Migration 44: Add deduct_wallet_balance RPC
 -- Purpose: Provide a reusable server-side function to deduct wallet balance and record wallet transactions.
 
+DROP FUNCTION IF EXISTS public.deduct_wallet_balance(numeric, text, uuid);
+
 CREATE OR REPLACE FUNCTION public.deduct_wallet_balance(
   p_user_id uuid,
   p_amount numeric,

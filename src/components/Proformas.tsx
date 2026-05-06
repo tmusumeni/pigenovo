@@ -592,7 +592,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       const { data: chargeData } = await supabase.from('settings').select('*').eq('id', 'proforma_send_charge').single();
       const chargeAmount = chargeData?.value?.charge || 0;
 
-      // Check user's wallet balance
+      // Check user's wallet balance before sending
       const { data: wallet, error: walletError } = await supabase
         .from('wallets')
         .select('balance')
@@ -605,20 +605,7 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         return;
       }
 
-      // Deduct from user's wallet
-      const { error: deductError } = await supabase
-        .rpc('deduct_wallet_balance', {
-          p_user_id: user.id,
-          p_amount: chargeAmount,
-          p_description: `Send proforma to ${proforma.client_email}`
-        });
-
-      if (deductError) throw deductError;
-
-      // Log charge to platform wallet
-      await platformWalletService.addProformaCharge(proforma.id, user.id, chargeAmount);
-
-      // Use RPC function to send proforma to receiver (NEW VERSION)
+      // Send the proforma and let the backend deduct the send charge once
       const { data, error } = await supabase.rpc('send_proforma_to_receiver_v2', {
         p_proforma_id: proforma.id,
         p_sender_user_id: user.id,
@@ -628,6 +615,12 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
       if (error) throw error;
       if (!data || !data.success) {
         throw new Error(data?.error || 'Failed to send proforma');
+      }
+
+      // Log the proforma send charge as platform earnings (backend already deducted the wallet charge)
+      const chargeLogged = await platformWalletService.addProformaCharge(proforma.id, user.id, chargeAmount);
+      if (!chargeLogged) {
+        console.error('Proforma sent, but failed to log charge in platform earnings');
       }
       
       toast.success(`✅ Proforma sent to ${proforma.client_email}`);
