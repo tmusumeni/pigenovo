@@ -38,13 +38,24 @@ export async function convertProformaToInvoice(proformaId: string, purchaseCode?
     const data = await parseJsonSafe(response);
 
     if (!response.ok) {
-      return { success: false, error: data.error || data.message || data.rawBody || 'Conversion failed' };
+      return {
+        success: false,
+        error:
+          data.error ||
+          data.message ||
+          data.rawBody ||
+          `Conversion failed (${response.status} ${response.statusText})`
+      };
     }
 
     if (!data?.invoiceId) {
       return {
         success: false,
-        error: data.error || data.message || data.rawBody || 'Conversion returned no invoice ID'
+        error:
+          data.error ||
+          data.message ||
+          data.rawBody ||
+          `Conversion returned no invoice ID (${response.status} ${response.statusText})`
       };
     }
 

@@ -125,23 +125,138 @@ async function startServer() {
         return res.status(400).json({ error: 'proformaId is required' });
       }
 
+      const fallbackConvertProforma = async () => {
+        const { data: proformaData, error: proformaError } = await supabaseBackend
+          .from('proformas')
+          .select('*')
+          .eq('id', proformaId)
+          .single();
+
+        if (proformaError || !proformaData) {
+          return { error: proformaError?.message || 'Proforma not found' };
+        }
+
+        if (proformaData.status === 'converted') {
+          return { error: 'Proforma already converted to invoice' };
+        }
+
+        const isOwner = proformaData.user_id === userData.user.id;
+        let hasPermission = isOwner;
+
+        if (!hasPermission) {
+          const { data: profileData, error: profileError } = await supabaseBackend
+            .from('profiles')
+            .select('role')
+            .eq('id', userData.user.id)
+            .single();
+
+          if (profileError) {
+            return { error: profileError.message || 'Failed to verify permissions' };
+          }
+
+          hasPermission = profileData?.role === 'admin';
+        }
+
+        if (!hasPermission) {
+          return { error: 'Proforma not found or permission denied' };
+        }
+
+        const invoicePayload = {
+          user_id: proformaData.user_id,
+          number: `INV-${proformaData.number}`,
+          client_name: proformaData.client_name,
+          client_phone: proformaData.client_phone,
+          client_email: proformaData.client_email,
+          amount: proformaData.amount,
+          currency: proformaData.currency,
+          description: proformaData.description,
+          status: 'draft',
+          invoice_date: new Date().toISOString(),
+          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          purchase_code: purchaseCode?.trim() || null,
+          converted_from_proforma: true,
+          converted_by: userData.user.id,
+          converted_at: new Date().toISOString(),
+          linked_proforma_id: proformaId,
+        };
+
+        const { data: invoiceInsert, error: invoiceError } = await supabaseBackend
+          .from('invoices')
+          .insert([invoicePayload])
+          .select('id')
+          .single();
+
+        if (invoiceError || !invoiceInsert?.id) {
+          return { error: invoiceError?.message || 'Invoice creation failed' };
+        }
+
+        const { data: proformaItems, error: itemsError } = await supabaseBackend
+          .from('proforma_items')
+          .select('*')
+          .eq('proforma_id', proformaId);
+
+        if (itemsError) {
+          return { error: itemsError.message || 'Failed to load proforma line items' };
+        }
+
+        const itemsToInsert = (proformaItems || []).map((item: any) => ({
+          invoice_id: invoiceInsert.id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          amount: item.amount,
+        }));
+
+        if (itemsToInsert.length > 0) {
+          const { error: invoiceItemsError } = await supabaseBackend
+            .from('invoice_items')
+            .insert(itemsToInsert);
+
+          if (invoiceItemsError) {
+            return { error: invoiceItemsError.message || 'Failed to create invoice items' };
+          }
+        }
+
+        const { error: updateError } = await supabaseBackend
+          .from('proformas')
+          .update({ status: 'converted', has_invoice: true, linked_invoice_id: invoiceInsert.id })
+          .eq('id', proformaId);
+
+        if (updateError) {
+          return { error: updateError.message || 'Failed to update proforma status' };
+        }
+
+        await supabaseBackend.from('proforma_audit_logs').insert([
+          {
+            action: 'PROFORMA_CONVERTED_TO_INVOICE',
+            user_id: userData.user.id,
+            proforma_id: proformaId,
+            invoice_id: invoiceInsert.id,
+            purchase_code: purchaseCode?.trim() || null,
+          },
+        ]).catch(() => null);
+
+        return { invoiceId: invoiceInsert.id };
+      };
+
       const { data, error } = await supabaseBackend.rpc('convert_proforma_to_invoice', {
         p_proforma_id: proformaId,
         p_user_id: userData.user.id,
         p_purchase_code: purchaseCode || null,
       });
 
-      if (error) {
-        console.error('Convert proforma error:', error);
-        return res.status(400).json({
-          error: error.message || 'Conversion failed',
-          details: error.details || error.code || null
-        });
-      }
+      if (error || !data) {
+        console.error('Convert proforma error:', error || 'No data returned from RPC');
 
-      if (!data) {
-        console.error('Convert proforma returned empty invoice id', { proformaId, userId: userData.user.id });
-        return res.status(500).json({ error: 'Conversion succeeded but no invoice id was returned' });
+        const fallbackResult = await fallbackConvertProforma();
+        if (!fallbackResult.error && fallbackResult.invoiceId) {
+          return res.json({ success: true, invoiceId: fallbackResult.invoiceId });
+        }
+
+        return res.status(400).json({
+          error: fallbackResult.error || error?.message || 'Conversion failed',
+          details: error?.details || error?.code || null,
+        });
       }
 
       return res.json({ success: true, invoiceId: data });
