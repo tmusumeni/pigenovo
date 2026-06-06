@@ -50,11 +50,25 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'proformaId is required' });
     }
 
-    const { data, error } = await supabase.rpc('convert_proforma_to_invoice', {
+    let rpcParams = {
       p_proforma_id: proformaId,
       p_user_id: userData.user.id,
       p_purchase_code: purchaseCode || null,
-    });
+    };
+
+    let rpcResult = await supabase.rpc('convert_proforma_to_invoice', rpcParams);
+    let { data, error } = rpcResult;
+
+    if (error && /could not find the function public\.convert_proforma_to_invoice/i.test(error.message || '')) {
+      // Fallback for older DB schema versions without purchase_code arg support
+      rpcParams = {
+        p_proforma_id: proformaId,
+        p_user_id: userData.user.id,
+      };
+      rpcResult = await supabase.rpc('convert_proforma_to_invoice', rpcParams);
+      data = rpcResult.data;
+      error = rpcResult.error;
+    }
 
     if (error || !data) {
       console.error('Convert proforma error:', error || 'No data returned from RPC');
