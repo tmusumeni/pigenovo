@@ -76,7 +76,7 @@ begin
     v_proforma_record.amount,
     v_proforma_record.currency,
     v_proforma_record.description,
-    'generated',
+    'draft',
     now(),
     now() + interval '30 days',
     nullif(trim(coalesce(p_purchase_code, '')), ''),
