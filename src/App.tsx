@@ -6,6 +6,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { PublicProformaView } from '@/components/PublicProformaView';
 import { PublicInvoiceView } from '@/components/PublicInvoiceView';
 import { LanguageProvider } from '@/lib/LanguageContext';
+import { PiAuthProvider } from '@/lib/PiAuthContext';
 import { Toaster } from '@/components/ui/sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { LOGO_URL } from '@/lib/constants';
@@ -54,77 +55,79 @@ export default function App() {
   }
 
   return (
-    <LanguageProvider>
-      <BrowserRouter>
-        <div className="min-h-screen bg-background selection:bg-primary/10 selection:text-primary">
-          <AnimatePresence mode="wait">
-            <Routes>
-              <Route 
-                path="/login" 
-                element={
-                  !session ? (
+    <PiAuthProvider autoInitialize={true}>
+      <LanguageProvider>
+        <BrowserRouter>
+          <div className="min-h-screen bg-background selection:bg-primary/10 selection:text-primary">
+            <AnimatePresence mode="wait">
+              <Routes>
+                <Route 
+                  path="/login" 
+                  element={
+                    !session ? (
+                      <motion.div
+                        key="auth"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        <Auth />
+                      </motion.div>
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  } 
+                />
+                <Route 
+                  path="/proforma/:shareToken" 
+                  element={
                     <motion.div
-                      key="auth"
+                      key="public-proforma"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                     >
-                      <Auth />
+                      <PublicProformaView />
                     </motion.div>
-                  ) : (
-                    <Navigate to="/" replace />
-                  )
-                } 
-              />
-              <Route 
-                path="/proforma/:shareToken" 
-                element={
-                  <motion.div
-                    key="public-proforma"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <PublicProformaView />
-                  </motion.div>
-                } 
-              />
-              <Route 
-                path="/invoice/:shareToken" 
-                element={
-                  <motion.div
-                    key="public-invoice"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <PublicInvoiceView />
-                  </motion.div>
-                } 
-              />
-              <Route 
-                path="/" 
-                element={
-                  session ? (
+                  } 
+                />
+                <Route 
+                  path="/invoice/:shareToken" 
+                  element={
                     <motion.div
-                      key="dashboard"
+                      key="public-invoice"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                     >
-                      <Dashboard user={session.user} />
+                      <PublicInvoiceView />
                     </motion.div>
-                  ) : (
-                    <Navigate to="/login" replace />
-                  )
-                } 
-              />
-              <Route path="*" element={<Navigate to={session ? "/" : "/login"} replace />} />
-            </Routes>
-          </AnimatePresence>
-          <Toaster position="top-right" richColors closeButton />
-        </div>
-      </BrowserRouter>
-    </LanguageProvider>
+                  } 
+                />
+                <Route 
+                  path="/" 
+                  element={
+                    session ? (
+                      <motion.div
+                        key="dashboard"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        <Dashboard user={session.user} />
+                      </motion.div>
+                    ) : (
+                      <Navigate to="/login" replace />
+                    )
+                  } 
+                />
+                <Route path="*" element={<Navigate to={session ? "/" : "/login"} replace />} />
+              </Routes>
+            </AnimatePresence>
+            <Toaster position="top-right" richColors closeButton />
+          </div>
+        </BrowserRouter>
+      </LanguageProvider>
+    </PiAuthProvider>
   );
 }

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PiAuthButton } from '@/components/PiAuthButton';
 import { toast } from 'sonner';
 import { LogIn, Mail, Github, Chrome, ShieldCheck, Phone, Smartphone } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -268,6 +269,7 @@ export function Auth() {
                 <Chrome className="mr-2 h-4 w-4" />
                 Google
               </Button>
+              <PiAuthButton />
             </div>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

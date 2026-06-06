@@ -87,6 +87,55 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Pi Network Authentication Validation Endpoint
+  app.post('/api/pi-validate', async (req, res) => {
+    try {
+      const { accessToken } = req.body;
+
+      if (!accessToken) {
+        return res.status(400).json({ error: 'Access token is required' });
+      }
+
+      // Validate token with Pi API
+      const piResponse = await fetch('https://api.minepi.com/v2/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!piResponse.ok) {
+        const errorData = await piResponse.json().catch(() => ({}));
+        console.error('Pi API validation failed:', piResponse.status, errorData);
+        return res.status(401).json({ 
+          error: 'Token validation failed',
+          details: errorData
+        });
+      }
+
+      const userData = await piResponse.json();
+
+      // User is valid - return user data and token
+      // In production, you would create a session/JWT here
+      return res.json({
+        success: true,
+        user: {
+          uid: userData.uid,
+          username: userData.username
+        },
+        accessToken: accessToken
+      });
+
+    } catch (error: any) {
+      console.error('Pi validation endpoint error:', error);
+      return res.status(500).json({ 
+        error: 'Token validation error',
+        message: error?.message
+      });
+    }
+  });
+
   // OAuth Callback for Supabase
   app.get(['/auth/callback', '/auth/callback/'], (req, res) => {
     res.send(`
