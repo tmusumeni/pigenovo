@@ -1,3 +1,4 @@
+import { parseJsonResponse } from './utils';
 import { supabase } from '../supabaseClient';
 import type { ConvertProformaResult } from '@/lib/types';
 
@@ -22,7 +23,7 @@ export async function convertProformaToInvoice(proformaId: string, purchaseCode?
       }),
     });
 
-    const data = await response.json();
+    const data = await parseJsonResponse<any>(response);
 
     if (!response.ok) {
       return { success: false, error: data.error || 'Conversion failed' };

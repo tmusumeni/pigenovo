@@ -1,3 +1,5 @@
+import { parseJsonResponse } from './utils';
+
 /**
  * PiService handles all communication with the Pi Network.
  * Provides authentication and user management via Pi SDK.
@@ -119,7 +121,7 @@ export class PiService {
         body: JSON.stringify({ accessToken })
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse<any>(response);
 
       if (!response.ok) {
         return {
