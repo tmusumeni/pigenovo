@@ -29,16 +29,23 @@ export default async function handler(req: any, res: any) {
     auth: { persistSession: false },
   });
 
-  supabase.auth.setAuth(token);
-
   try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData?.user) {
       console.error('Supabase auth validation failed:', userError);
       return res.status(401).json({ error: 'Invalid authentication token' });
     }
 
-    const { proformaId, purchaseCode } = req.body || {};
+    let requestBody = req.body;
+    if (typeof requestBody === 'string') {
+      try {
+        requestBody = JSON.parse(requestBody);
+      } catch {
+        return res.status(400).json({ error: 'Invalid JSON body' });
+      }
+    }
+
+    const { proformaId, purchaseCode } = requestBody || {};
     if (!proformaId) {
       return res.status(400).json({ error: 'proformaId is required' });
     }
