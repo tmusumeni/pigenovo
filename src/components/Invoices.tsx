@@ -913,6 +913,7 @@ export function Invoices() {
                   <p className="text-xs text-muted-foreground">Bill To</p>
                   <p className="font-bold">{selectedInvoice.client_name}</p>
                   {selectedInvoice.client_phone && <p className="text-sm">{selectedInvoice.client_phone}</p>}
+                  {selectedInvoice.purchase_code && <p className="text-sm">Purchase Code: {selectedInvoice.purchase_code}</p>}
                   {selectedInvoice.client_email && <p className="text-sm">{selectedInvoice.client_email}</p>}
                 </div>
                 <div>
@@ -927,8 +928,6 @@ export function Invoices() {
                   <p className="text-xs px-2 py-1 rounded-full font-semibold w-fit bg-blue-100 text-blue-700">
                     {selectedInvoice.status.toUpperCase()}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-3">Purchase Code</p>
-                  <p className="text-sm font-medium">{selectedInvoice.purchase_code || 'N/A'}</p>
                 </div>
               </div>
 

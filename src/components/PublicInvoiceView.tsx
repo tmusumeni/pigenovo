@@ -273,6 +273,7 @@ export function PublicInvoiceView() {
                 <p className="text-xs font-bold text-slate-700 mb-3">📋 BILL TO</p>
                 <p className="font-semibold">{invoice.client_name}</p>
                 {invoice.client_phone && <p className="text-sm">{invoice.client_phone}</p>}
+                {invoice.purchase_code && <p className="text-sm">Purchase Code: {invoice.purchase_code}</p>}
                 {invoice.client_email && <p className="text-sm">{invoice.client_email}</p>}
               </div>
 
