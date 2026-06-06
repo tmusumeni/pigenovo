@@ -1,5 +1,3 @@
-import { parseJsonResponse } from './utils';
-
 /**
  * Google Translate Service
  * Handles API communication with server for Google Translate
@@ -79,7 +77,7 @@ export const googleTranslateService = {
         throw new Error(`Translation failed: ${response.statusText}`);
       }
 
-      const data = await parseJsonResponse<TranslationResponse>(response);
+      const data = await response.json();
       return data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -139,7 +137,7 @@ export const googleTranslateService = {
         throw new Error(`Batch translation failed: ${response.statusText}`);
       }
 
-      return await parseJsonResponse<BatchTranslationResponse>(response);
+      return await response.json();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Batch translation error:', errorMessage);
@@ -165,7 +163,7 @@ export const googleTranslateService = {
         throw new Error(`Failed to get languages: ${response.statusText}`);
       }
 
-      const data = await parseJsonResponse<{ languages?: any[] }>(response);
+      const data = await response.json();
       return data.languages || [];
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

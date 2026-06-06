@@ -1,5 +1,3 @@
-import { parseJsonResponse } from './utils';
-
 /**
  * PiService handles all communication with the Pi Network.
  * Provides authentication and user management via Pi SDK.
@@ -22,6 +20,19 @@ export interface PiAuthResult {
   accessToken?: string;
   error?: string;
   message?: string;
+}
+
+async function parseJsonSafe(response: Response): Promise<any> {
+  const text = await response.text();
+  if (!text.trim()) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { rawBody: text };
+  }
 }
 
 export class PiService {
@@ -121,12 +132,13 @@ export class PiService {
         body: JSON.stringify({ accessToken })
       });
 
-      const data = await parseJsonResponse<any>(response);
+      const data = await parseJsonSafe(response);
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.error || 'Token validation failed'
+          error: data.error || data.message || 'Token validation failed',
+          message: data.rawBody ? `Unexpected response: ${data.rawBody}` : undefined
         };
       }
 

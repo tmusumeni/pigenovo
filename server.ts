@@ -91,10 +91,11 @@ async function startServer() {
 
   app.post('/api/proforma/convert', async (req, res) => {
     try {
-      const supabaseUrl = process.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+      const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
-      if (!supabaseUrl || !supabaseAnonKey) {
+      if (!supabaseUrl || (!supabaseServiceRoleKey && !supabaseAnonKey)) {
         return res.status(500).json({ error: 'Supabase configuration is missing' });
       }
 
@@ -104,11 +105,15 @@ async function startServer() {
       }
 
       const token = authHeader.split(' ')[1];
-      const supabaseBackend = createClient(supabaseUrl, supabaseAnonKey);
+      const supabaseKey = supabaseServiceRoleKey || supabaseAnonKey;
+      const supabaseBackend = createClient(supabaseUrl, supabaseKey, {
+        auth: { persistSession: false }
+      });
       supabaseBackend.auth.setAuth(token);
 
       const { data: userData, error: userError } = await supabaseBackend.auth.getUser();
       if (userError || !userData?.user) {
+        console.error('Supabase auth validation failed:', userError);
         return res.status(401).json({ error: 'Invalid authentication token' });
       }
 
@@ -125,7 +130,15 @@ async function startServer() {
 
       if (error) {
         console.error('Convert proforma error:', error);
-        return res.status(400).json({ error: error.message || 'Conversion failed' });
+        return res.status(400).json({
+          error: error.message || 'Conversion failed',
+          details: error.details || error.code || null
+        });
+      }
+
+      if (!data) {
+        console.error('Convert proforma returned empty invoice id', { proformaId, userId: userData.user.id });
+        return res.status(500).json({ error: 'Conversion succeeded but no invoice id was returned' });
       }
 
       return res.json({ success: true, invoiceId: data });

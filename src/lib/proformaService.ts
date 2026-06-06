@@ -1,6 +1,18 @@
-import { parseJsonResponse } from './utils';
 import { supabase } from '../supabaseClient';
 import type { ConvertProformaResult } from '@/lib/types';
+
+async function parseJsonSafe(response: Response): Promise<any> {
+  const text = await response.text();
+  if (!text.trim()) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { rawBody: text };
+  }
+}
 
 export async function convertProformaToInvoice(proformaId: string, purchaseCode?: string): Promise<ConvertProformaResult> {
   try {
@@ -23,10 +35,17 @@ export async function convertProformaToInvoice(proformaId: string, purchaseCode?
       }),
     });
 
-    const data = await parseJsonResponse<any>(response);
+    const data = await parseJsonSafe(response);
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Conversion failed' };
+      return { success: false, error: data.error || data.message || data.rawBody || 'Conversion failed' };
+    }
+
+    if (!data?.invoiceId) {
+      return {
+        success: false,
+        error: data.error || data.message || data.rawBody || 'Conversion returned no invoice ID'
+      };
     }
 
     return {
