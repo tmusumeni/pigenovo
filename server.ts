@@ -16,9 +16,25 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(cors());
-  app.options('*', cors());
+  const corsOptions = {
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  };
+
+  app.use(cors(corsOptions));
+  app.options('*', cors(corsOptions));
   app.use(express.json());
+
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      console.log('[API]', req.method, req.path);
+    }
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    next();
+  });
 
   // Mock Database for News Assets (In a real app, these would be in Supabase)
   let newsAssets = [
@@ -93,7 +109,7 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  app.post('/api/proforma/convert', async (req, res) => {
+  app.post('/api/proforma/convert', cors(corsOptions), async (req, res) => {
     try {
       const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
       const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -141,8 +157,9 @@ async function startServer() {
           return { error: 'Proforma already converted to invoice' };
         }
 
-        const isOwner = proformaData.user_id === userData.user.id;
-        let hasPermission = isOwner;
+        const isSender = proformaData.user_id === userData.user.id;
+        const isAcceptedReceiver = proformaData.client_user_id === userData.user.id && proformaData.status === 'accepted';
+        let hasPermission = isSender || isAcceptedReceiver;
 
         if (!hasPermission) {
           const { data: profileData, error: profileError } = await supabaseBackend

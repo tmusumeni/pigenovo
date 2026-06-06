@@ -601,9 +601,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     if (!currentUser) return false;
 
     const isSender = proforma.user_id === currentUser.id;
+    const isAcceptedReceiver = proforma.client_user_id === currentUser.id && proforma.status === 'accepted';
     const isAdmin = currentUserProfile?.role === 'admin' || currentUser.email === 'tmusumeni@gmail.com';
 
-    return (isSender || isAdmin) && proforma.status !== 'converted' && proforma.status !== 'rejected';
+    return (isSender || isAcceptedReceiver || isAdmin) && proforma.status !== 'converted' && proforma.status !== 'rejected';
   };
 
   const handleSendProforma = async (proforma: ProformaWithItems) => {
