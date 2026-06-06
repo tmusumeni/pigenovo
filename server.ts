@@ -17,6 +17,7 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(cors());
+  app.options('*', cors());
   app.use(express.json());
 
   // Mock Database for News Assets (In a real app, these would be in Supabase)
