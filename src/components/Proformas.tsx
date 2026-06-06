@@ -11,6 +11,8 @@ import { Plus, Download, Send, CheckCircle, XCircle, ArrowRight, Trash2, Eye, Ed
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomerSelector } from '@/components/CustomerSelector';
 import { CustomerModal } from '@/components/CustomerModal';
+import { ConvertProformaModal } from '@/components/ConvertProformaModal';
+import { convertProformaToInvoice } from '@/lib/proformaService';
 import { type Customer } from '@/lib/customerService';
 import { LOGO_URL } from '@/lib/constants';
 import QRCode from 'qrcode';
@@ -87,6 +89,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
   const [lastNotifiedIds, setLastNotifiedIds] = useState<Set<string>>(new Set());
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [selectedConvertProforma, setSelectedConvertProforma] = useState<Proforma | null>(null);
+  const [convertLoading, setConvertLoading] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -118,6 +124,17 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
+      if (user) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!profileError) {
+          setCurrentUserProfile(profileData || null);
+        }
+      }
       fetchProformas();
       fetchReceivedProformas();
       fetchExportCharge();
@@ -552,29 +569,41 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
     }
   };
 
-  const handleConvertToInvoice = async (proforma: Proforma) => {
+  const handleOpenConvertModal = (proforma: Proforma) => {
+    setSelectedConvertProforma(proforma);
+    setShowConvertModal(true);
+  };
+
+  const handleConvertToInvoice = async (purchaseCode?: string) => {
+    if (!selectedConvertProforma) return;
+
     try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      setConvertLoading(true);
+      const result = await convertProformaToInvoice(selectedConvertProforma.id, purchaseCode);
 
-      // Call RPC function to convert proforma to invoice
-      const { data, error } = await supabase.rpc('convert_proforma_to_invoice', {
-        p_proforma_id: proforma.id,
-        p_user_id: user.id
-      });
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to convert proforma');
+      }
 
-      if (error) throw error;
-
-      toast.success(`✅ ${t('proforma.convert_to_invoice')} ${t('common.success')}`);
+      toast.success('Invoice generated successfully.');
+      setShowConvertModal(false);
+      setSelectedConvertProforma(null);
       fetchProformas();
-      // Navigate to invoices tab
       setActiveTab('invoices');
     } catch (error: any) {
       toast.error(error.message || 'Failed to convert proforma');
     } finally {
-      setLoading(false);
+      setConvertLoading(false);
     }
+  };
+
+  const canConvertProforma = (proforma: Proforma) => {
+    if (!currentUser) return false;
+
+    const isSender = proforma.user_id === currentUser.id;
+    const isAdmin = currentUserProfile?.role === 'admin' || currentUser.email === 'tmusumeni@gmail.com';
+
+    return (isSender || isAdmin) && proforma.status !== 'converted' && proforma.status !== 'rejected';
   };
 
   const handleSendProforma = async (proforma: ProformaWithItems) => {
@@ -2175,10 +2204,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                       </>
                     )}
 
-                    {proforma.status === 'accepted' && (
+                    {canConvertProforma(proforma) && (
                       <Button
                         size="sm"
-                        onClick={() => handleConvertToInvoice(proforma)}
+                        onClick={() => handleOpenConvertModal(proforma)}
                         disabled={loading}
                         className="gap-1 bg-green-600 hover:bg-green-700"
                       >
@@ -2333,10 +2362,10 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
                         </>
                       )}
 
-                      {proforma.status === 'accepted' && (
+                      {canConvertProforma(proforma) && (
                         <Button
                           size="sm"
-                          onClick={() => handleConvertToInvoice(proforma)}
+                          onClick={() => handleOpenConvertModal(proforma)}
                           disabled={loading}
                           className="gap-1 bg-green-600 hover:bg-green-700"
                         >
@@ -2364,6 +2393,14 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
           </Tabs>
         </CardContent>
       </Card>
+
+      <ConvertProformaModal
+        open={showConvertModal}
+        proforma={selectedConvertProforma}
+        isLoading={convertLoading}
+        onOpenChange={setShowConvertModal}
+        onConvert={handleConvertToInvoice}
+      />
 
       {/* Preview Modal */}
       {showPreview && previewProforma && (

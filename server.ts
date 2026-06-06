@@ -1,8 +1,10 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import cors from 'cors';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,6 +87,52 @@ async function startServer() {
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  app.post('/api/proforma/convert', async (req, res) => {
+    try {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return res.status(500).json({ error: 'Supabase configuration is missing' });
+      }
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing authorization token' });
+      }
+
+      const token = authHeader.split(' ')[1];
+      const supabaseBackend = createClient(supabaseUrl, supabaseAnonKey);
+      supabaseBackend.auth.setAuth(token);
+
+      const { data: userData, error: userError } = await supabaseBackend.auth.getUser();
+      if (userError || !userData?.user) {
+        return res.status(401).json({ error: 'Invalid authentication token' });
+      }
+
+      const { proformaId, purchaseCode } = req.body;
+      if (!proformaId) {
+        return res.status(400).json({ error: 'proformaId is required' });
+      }
+
+      const { data, error } = await supabaseBackend.rpc('convert_proforma_to_invoice', {
+        p_proforma_id: proformaId,
+        p_user_id: userData.user.id,
+        p_purchase_code: purchaseCode || null,
+      });
+
+      if (error) {
+        console.error('Convert proforma error:', error);
+        return res.status(400).json({ error: error.message || 'Conversion failed' });
+      }
+
+      return res.json({ success: true, invoiceId: data });
+    } catch (error: any) {
+      console.error('Proforma conversion endpoint error:', error);
+      return res.status(500).json({ error: error?.message || 'Conversion endpoint failed' });
+    }
   });
 
   // Pi Network Authentication Validation Endpoint

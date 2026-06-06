@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '@/lib/LanguageContext';
+import { type Invoice, type InvoiceItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,38 +12,6 @@ import { motion } from 'motion/react';
 import { Plus, Download, Printer, Edit2, Trash2, Eye, Send, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { LOGO_URL } from '@/lib/constants';
 import QRCode from 'qrcode';
-
-interface Invoice {
-  id: string;
-  number: string;
-  client_name: string;
-  client_phone: string;
-  client_email?: string;
-  amount: number;
-  currency: string;
-  description: string;
-  status: 'draft' | 'sent' | 'paid' | 'overdue';
-  invoice_date: string;
-  due_date?: string;
-  payment_method?: string;
-  paid_date?: string;
-  tax_rate?: number;
-  discount_rate?: number;
-  tax_amount?: number;
-  discount_amount?: number;
-  total_amount?: number;
-  stamp_url?: string;
-  user_id: string;
-  created_at: string;
-}
-
-interface InvoiceItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unit_price: number;
-  amount: number;
-}
 
 export function Invoices() {
   const { t } = useLanguage();
@@ -949,10 +918,17 @@ export function Invoices() {
                 <div>
                   <p className="text-xs text-muted-foreground">Invoice #</p>
                   <p className="font-mono font-bold">{selectedInvoice.number}</p>
+                  {selectedInvoice.converted_from_proforma && (
+                    <p className="mt-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-[11px] font-semibold uppercase text-blue-700">
+                      Converted from Proforma
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-2">Status</p>
                   <p className="text-xs px-2 py-1 rounded-full font-semibold w-fit bg-blue-100 text-blue-700">
                     {selectedInvoice.status.toUpperCase()}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-3">Purchase Code</p>
+                  <p className="text-sm font-medium">{selectedInvoice.purchase_code || 'N/A'}</p>
                 </div>
               </div>
 
