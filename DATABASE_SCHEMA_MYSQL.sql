@@ -586,6 +586,7 @@ CREATE TABLE invoices (
   client_email VARCHAR(255),
   client_phone VARCHAR(20),
   invoice_number VARCHAR(50) UNIQUE,
+  purchase_code VARCHAR(255),
   invoice_date DATE,
   due_date DATE,
   subject VARCHAR(255),

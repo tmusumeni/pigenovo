@@ -336,6 +336,12 @@ export function Invoices() {
             color: #666;
             text-align: center;
           }
+          .purchase-order {
+            margin-top: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #334155;
+          }
           .footer-note {
             margin-top: 10px;
             font-style: italic;
@@ -369,7 +375,7 @@ export function Invoices() {
             <div class="header-section">
             <div class="title">INVOICE</div>
             <div class="subtitle">Invoice Number: ${invoice.number}</div>
-            ${invoice.purchase_code ? `<div class="subtitle">Purchase Order: ${invoice.purchase_code}</div>` : ''}
+            ${invoice.purchase_code ? `<div class="subtitle purchase-order">Purchase Order: ${invoice.purchase_code}</div>` : ''}
           </div>
 
           <div class="two-column">
