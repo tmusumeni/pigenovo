@@ -43,7 +43,7 @@ export function ConvertProformaModal({ open, proforma, isLoading, onOpenChange, 
         <DialogHeader>
           <DialogTitle>Convert Proforma to Invoice</DialogTitle>
           <DialogDescription>
-            Enter Purchase Code if available. Leave blank if no purchase code exists.
+              Enter Purchase Order if available. Leave blank if no purchase order exists.
           </DialogDescription>
         </DialogHeader>
 
@@ -52,14 +52,14 @@ export function ConvertProformaModal({ open, proforma, isLoading, onOpenChange, 
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="purchaseCode">Purchase Code</Label>
+              <Label htmlFor="purchaseCode">Purchase Order</Label>
             <Input
               id="purchaseCode"
               placeholder="Enter purchase code"
               {...form.register('purchaseCode')}
             />
             <p className="text-xs text-muted-foreground">
-              Enter Purchase Code if available. Leave blank if no purchase code exists.
+                Enter Purchase Order if available. Leave blank if no purchase order exists.
             </p>
           </div>
 

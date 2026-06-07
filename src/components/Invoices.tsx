@@ -378,6 +378,7 @@ export function Invoices() {
                 <p><strong>${invoice.client_name}</strong></p>
                 ${invoice.client_email ? `<p>${invoice.client_email}</p>` : ''}
                 ${invoice.client_phone ? `<p>${invoice.client_phone}</p>` : ''}
+                ${invoice.purchase_code ? `<p>Purchase Order: ${invoice.purchase_code}</p>` : ''}
               </div>
             </div>
             <div class="column">
@@ -913,7 +914,7 @@ export function Invoices() {
                   <p className="text-xs text-muted-foreground">Bill To</p>
                   <p className="font-bold">{selectedInvoice.client_name}</p>
                   {selectedInvoice.client_phone && <p className="text-sm">{selectedInvoice.client_phone}</p>}
-                  {selectedInvoice.purchase_code && <p className="text-sm">Purchase Code: {selectedInvoice.purchase_code}</p>}
+                  {selectedInvoice.purchase_code && <p className="text-sm">Purchase Order: {selectedInvoice.purchase_code}</p>}
                   {selectedInvoice.client_email && <p className="text-sm">{selectedInvoice.client_email}</p>}
                 </div>
                 <div>
