@@ -366,9 +366,10 @@ export function Invoices() {
             </div>
           </div>
 
-          <div class="header-section">
+            <div class="header-section">
             <div class="title">INVOICE</div>
             <div class="subtitle">Invoice Number: ${invoice.number}</div>
+            ${invoice.purchase_code ? `<div class="subtitle">Purchase Order: ${invoice.purchase_code}</div>` : ''}
           </div>
 
           <div class="two-column">
@@ -920,6 +921,9 @@ export function Invoices() {
                 <div>
                   <p className="text-xs text-muted-foreground">Invoice #</p>
                   <p className="font-mono font-bold">{selectedInvoice.number}</p>
+                  {selectedInvoice.purchase_code && (
+                    <p className="text-sm mt-1">Purchase Order: {selectedInvoice.purchase_code}</p>
+                  )}
                   {selectedInvoice.converted_from_proforma && (
                     <p className="mt-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-[11px] font-semibold uppercase text-blue-700">
                       Converted from Proforma
