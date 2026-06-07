@@ -672,7 +672,8 @@ export function Invoices() {
 
   const filteredInvoices = invoices.filter((inv: Invoice) =>
     inv.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    inv.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inv.purchase_code?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getStatusIcon = (status: string) => {
@@ -832,6 +833,11 @@ export function Invoices() {
                           Total: {invoice.total_amount?.toLocaleString() || invoice.amount.toLocaleString()} {invoice.currency}
                         </div>
                       )}
+                      {invoice.purchase_code ? (
+                        <div className="text-sm text-slate-700 mt-2">
+                          Purchase Order: <span className="font-semibold">{invoice.purchase_code}</span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex gap-2">

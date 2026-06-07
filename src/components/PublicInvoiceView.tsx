@@ -24,6 +24,7 @@ interface Invoice {
   created_at: string;
   stamp_url?: string;
   stamp_uploaded_at?: string;
+  purchase_code?: string;
 }
 
 interface InvoiceItem {
