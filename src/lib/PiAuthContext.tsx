@@ -39,6 +39,24 @@ export function PiAuthProvider({ children, autoInitialize = true }: PiAuthProvid
         setError(null);
         await piService.init();
         setInitialized(true);
+        // Auto-authenticate after successful init
+        try {
+          // Attempt to authenticate silently and validate token on backend
+          const authResult = await piService.authenticate(['username']);
+          if (authResult && authResult.success && authResult.accessToken) {
+            const validationResult = await piService.validateTokenOnBackend(authResult.accessToken);
+            if (validationResult && validationResult.success) {
+              setUser(validationResult.user || authResult.user || null);
+              setAccessToken(validationResult.accessToken || authResult.accessToken || null);
+            } else {
+              console.warn('Auto-login validation failed:', validationResult.error);
+            }
+          } else {
+            console.warn('Auto-authenticate returned no user or token');
+          }
+        } catch (err) {
+          console.warn('Auto-login error:', err);
+        }
       } catch (err: any) {
         const errorMsg = err?.message || 'Failed to initialize Pi SDK';
         console.error('Pi initialization error:', errorMsg);

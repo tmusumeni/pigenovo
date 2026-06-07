@@ -50,12 +50,35 @@ export class PiService {
     }
 
     try {
-      // Ensure window.Pi is available
+      // Load the Pi SDK script dynamically if not present
       if (!window.Pi) {
-        throw new Error('Pi SDK not loaded. Ensure pi-sdk.js is included in HTML head.');
+        await new Promise<void>((resolve, reject) => {
+          const existing = document.querySelector('script[data-pi-sdk]');
+          if (existing) {
+            // wait for it to attach window.Pi
+            const check = () => {
+              if (window.Pi) return resolve();
+              setTimeout(check, 50);
+            };
+            check();
+            return;
+          }
+
+          const s = document.createElement('script');
+          s.setAttribute('data-pi-sdk', '1');
+          s.src = 'https://sdk.minepi.com/pi-sdk.js';
+          s.async = true;
+          s.onload = () => resolve();
+          s.onerror = (e) => reject(new Error('Failed to load Pi SDK'));
+          document.head.appendChild(s);
+        });
       }
 
-      // Initialize Pi SDK
+      // Initialize Pi SDK (Pi.init returns a promise-like object)
+      if (!window.Pi) {
+        throw new Error('Pi SDK not available after load');
+      }
+
       await window.Pi.init({
         version: '2.0',
         scopes: ['username'],
