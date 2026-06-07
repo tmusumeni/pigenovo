@@ -189,6 +189,9 @@ export function PublicInvoiceView() {
         >
           <div className="text-left">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Invoice #{invoice.number}</h1>
+            {invoice.purchase_code && (
+              <p className="text-lg text-slate-700 mt-1">Purchase Order: {invoice.purchase_code}</p>
+            )}
             <p className="text-slate-600">Shared publicly for viewing</p>
           </div>
           <img
