@@ -46,6 +46,7 @@ export default async function handler(req: any, res: any) {
     }
 
     const { proformaId, purchaseCode } = requestBody || {};
+    console.log('convert.ts request:', { proformaId, purchaseCode });
     if (!proformaId) {
       return res.status(400).json({ error: 'proformaId is required' });
     }
@@ -56,11 +57,13 @@ export default async function handler(req: any, res: any) {
       p_purchase_code: purchaseCode || null,
     };
 
+    console.log('convert.ts calling RPC with params:', rpcParams);
     let rpcResult = await supabase.rpc('convert_proforma_to_invoice', rpcParams);
     let { data, error } = rpcResult;
+    let usedFallback = false;
 
-    if (error && /could not find the function public\.convert_proforma_to_invoice/i.test(error.message || '')) {
-      // Fallback for older DB schema versions without purchase_code arg support
+    if (error && /could not find the function public\.convert_proforma_to_invoice|does not exist/i.test(error.message || '')) {
+      console.warn('convert.ts fallback triggered for old RPC signature:', error.message);
       rpcParams = {
         p_proforma_id: proformaId,
         p_user_id: userData.user.id,
@@ -68,6 +71,7 @@ export default async function handler(req: any, res: any) {
       rpcResult = await supabase.rpc('convert_proforma_to_invoice', rpcParams);
       data = rpcResult.data;
       error = rpcResult.error;
+      usedFallback = true;
     }
 
     if (error || !data) {
@@ -78,7 +82,19 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    return res.status(200).json({ success: true, invoiceId: data });
+    if (usedFallback && purchaseCode) {
+      console.log('convert.ts updating invoice purchase_code after fallback:', { invoiceId: data, purchaseCode });
+      const { error: updateError } = await supabase
+        .from('invoices')
+        .update({ purchase_code: purchaseCode.trim() })
+        .eq('id', data);
+
+      if (updateError) {
+        console.error('convert.ts failed to update fallback invoice purchase_code:', updateError.message);
+      }
+    }
+
+    return res.status(200).json({ success: true, invoiceId: data, purchaseCode: purchaseCode || null });
   } catch (error: any) {
     console.error('Proforma conversion endpoint error:', error);
     return res.status(500).json({ error: error?.message || 'Conversion endpoint failed' });

@@ -138,6 +138,7 @@ async function startServer() {
       }
 
       const { proformaId, purchaseCode } = req.body;
+      console.log('server.ts convert request:', { proformaId, purchaseCode });
       if (!proformaId) {
         return res.status(400).json({ error: 'proformaId is required' });
       }
@@ -257,11 +258,14 @@ async function startServer() {
         return { invoiceId: invoiceInsert.id };
       };
 
-      const { data, error } = await supabaseBackend.rpc('convert_proforma_to_invoice', {
+      const rpcParams = {
         p_proforma_id: proformaId,
         p_user_id: userData.user.id,
         p_purchase_code: purchaseCode || null,
-      });
+      };
+      console.log('server.ts calling RPC with params:', rpcParams);
+
+      const { data, error } = await supabaseBackend.rpc('convert_proforma_to_invoice', rpcParams);
 
       if (error || !data) {
         console.error('Convert proforma error:', error || 'No data returned from RPC');

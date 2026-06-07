@@ -585,7 +585,9 @@ export function Proformas({ setActiveTab }: { setActiveTab: (tab: string) => voi
         throw new Error(result.error || 'Failed to convert proforma');
       }
 
-      toast.success('Invoice generated successfully.');
+      toast.success(
+        `Invoice generated successfully${purchaseCode ? ` with Purchase Order: ${purchaseCode}` : ''}.`
+      );
       setShowConvertModal(false);
       setSelectedConvertProforma(null);
       fetchProformas();

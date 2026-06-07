@@ -55,7 +55,7 @@ export function ConvertProformaModal({ open, proforma, isLoading, onOpenChange, 
               <Label htmlFor="purchaseCode">Purchase Order</Label>
             <Input
               id="purchaseCode"
-              placeholder="Enter purchase code"
+              placeholder="Enter purchase order"
               {...form.register('purchaseCode')}
             />
             <p className="text-xs text-muted-foreground">
