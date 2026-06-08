@@ -49,6 +49,7 @@ export interface ProformaWithItems extends Proforma {
 export interface Invoice {
   id: string;
   number: string;
+  invoiceNumber?: string;
   client_name: string;
   client_phone: string;
   client_email?: string;
@@ -69,7 +70,9 @@ export interface Invoice {
   user_id: string;
   created_at: string;
   purchase_code?: string;
+  purchaseCode?: string | null;
   converted_from_proforma?: boolean;
+  convertedFromProforma?: boolean;
   converted_by?: string;
   converted_at?: string;
   linked_proforma_id?: string;
