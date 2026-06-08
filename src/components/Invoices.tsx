@@ -851,9 +851,6 @@ export function Invoices() {
                       {getStatusIcon(invoice.status)}
                       <span className="font-mono font-bold">{invoice.number}</span>
                       <span className="text-sm text-muted-foreground">{invoice.client_name}</span>
-                      {(invoice.convertedFromProforma ?? invoice.converted_from_proforma) && (
-                        <span className="ml-3 text-sm font-semibold text-slate-700">{(invoice.purchaseCode ?? invoice.purchase_code) || 'N/A'}</span>
-                      )}
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
                       <div>

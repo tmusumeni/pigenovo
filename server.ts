@@ -255,7 +255,7 @@ async function startServer() {
           },
         ]).catch(() => null);
 
-        return { invoiceId: invoiceInsert.id, purchaseCode: purchaseCode?.trim() || null };
+        return { invoiceId: invoiceInsert.id };
       };
 
       const rpcParams = {
@@ -272,7 +272,7 @@ async function startServer() {
 
         const fallbackResult = await fallbackConvertProforma();
         if (!fallbackResult.error && fallbackResult.invoiceId) {
-          return res.json({ success: true, invoiceId: fallbackResult.invoiceId, purchaseCode: fallbackResult.purchaseCode || null });
+          return res.json({ success: true, invoiceId: fallbackResult.invoiceId });
         }
 
         return res.status(400).json({
@@ -281,7 +281,7 @@ async function startServer() {
         });
       }
 
-      return res.json({ success: true, invoiceId: data, purchaseCode: purchaseCode || null });
+      return res.json({ success: true, invoiceId: data });
     } catch (error: any) {
       console.error('Proforma conversion endpoint error:', error);
       return res.status(500).json({ error: error?.message || 'Conversion endpoint failed' });
