@@ -407,7 +407,7 @@ export function Invoices() {
             <div class="meta-row"><span class="meta-label">Invoice Number:</span><span class="meta-value">${normalizedInvoiceNumber}</span></div>
             <div class="meta-row"><span class="meta-label">Invoice Date:</span><span class="meta-value">${new Date(invoice.invoice_date).toLocaleDateString()}</span></div>
             ${invoice.due_date ? `<div class="meta-row"><span class="meta-label">Due Date:</span><span class="meta-value">${new Date(invoice.due_date).toLocaleDateString()}</span></div>` : ''}
-            ${isConvertedFromProforma ? `<div class="meta-row"><span class="meta-label">Purchase Order Code:</span><span class="meta-value">${purchaseOrderText}</span></div>` : ''}
+            ${((isConvertedFromProforma) || (purchaseCodeValue && purchaseCodeValue.length > 0)) ? `<div class="meta-row"><span class="meta-label">Purchase Order Code:</span><span class="meta-value">${purchaseOrderText}</span></div>` : ''}
             <div class="meta-row"><span class="meta-label">Status:</span><span class="meta-value">${invoice.status}</span></div>
           </div>
 
@@ -969,10 +969,10 @@ export function Invoices() {
                   {selectedInvoice.due_date && (
                     <p className="text-sm"><span className="font-semibold">Due Date:</span> {new Date(selectedInvoice.due_date).toLocaleDateString()}</p>
                   )}
-                  {(selectedInvoice.convertedFromProforma ?? selectedInvoice.converted_from_proforma) && (
-                    <p className="text-sm mt-1"><span className="font-semibold">Purchase Order Code:</span> {(selectedInvoice.purchaseCode ?? selectedInvoice.purchase_code)?.trim() || 'N/A'}</p>
+                  {(((selectedInvoice.convertedFromProforma ?? selectedInvoice.converted_from_proforma) || ((selectedInvoice.purchaseCode ?? selectedInvoice.purchase_code) && (selectedInvoice.purchaseCode ?? selectedInvoice.purchase_code).toString().trim().length > 0))) && (
+                    <p className="text-sm mt-1"><span className="font-semibold">Purchase Order Code:</span> {(selectedInvoice.purchaseCode ?? selectedInvoice.purchase_code)?.toString().trim() || 'N/A'}</p>
                   )}
-                  {(selectedInvoice.convertedFromProforma ?? selectedInvoice.converted_from_proforma) && (
+                  {(((selectedInvoice.convertedFromProforma ?? selectedInvoice.converted_from_proforma) || ((selectedInvoice.purchaseCode ?? selectedInvoice.purchase_code) && (selectedInvoice.purchaseCode ?? selectedInvoice.purchase_code).toString().trim().length > 0))) && (
                     <p className="mt-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-[11px] font-semibold uppercase text-blue-700">
                       Converted from Proforma
                     </p>
